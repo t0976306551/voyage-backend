@@ -12,7 +12,11 @@ dotenv.config();
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  url: process.env.DATABASE_URL,
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432', 10),
+  username: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'voyagestack',
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Trip, Itinerary, Expense, Task, Attachment],
