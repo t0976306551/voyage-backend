@@ -1,0 +1,97 @@
+openapi: 3.0.0
+info:
+  title: VoyageStack API
+  version: 1.0.0
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/trips:
+    get:
+      summary: Get my trips
+      responses:
+        '200':
+          description: List of trips
+    post:
+      summary: Create a trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Created trip
+
+  /api/trips/join:
+    post:
+      summary: Join trip by invite code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inviteCode]
+              properties:
+                inviteCode:
+                  type: string
+      responses:
+        '200':
+          description: Joined trip
+
+  /api/trips/{tripId}:
+    get:
+      summary: Get trip by ID
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip detail
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+    patch:
+      summary: Update trip
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated trip
+        '403':
+          description: Forbidden
