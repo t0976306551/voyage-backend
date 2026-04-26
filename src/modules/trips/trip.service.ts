@@ -3,7 +3,7 @@ import { Trip } from './trip.entity';
 import { TripRepository } from './trip.repository';
 
 function generateInviteCode(): string {
-  return randomBytes(4).toString('hex').toUpperCase();
+  return randomBytes(6).toString('hex').toUpperCase();
 }
 
 interface CreateTripDto {
@@ -48,7 +48,7 @@ export class TripService {
   async updateTrip(tripId: string, dto: UpdateTripDto, userId: string): Promise<Trip> {
     const trip = await this.getTripById(tripId, userId);
     const member = trip.members.find((m) => m.userId === userId);
-    if (member?.role === 'Viewer') throw new Error('FORBIDDEN');
+    if (!['Owner', 'Editor'].includes(member?.role ?? '')) throw new Error('FORBIDDEN');
 
     return this.repo.update(tripId, dto);
   }
