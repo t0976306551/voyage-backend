@@ -28,10 +28,13 @@ export async function createItem(req: Request, res: Response): Promise<void> {
 
 export async function updateItem(req: Request, res: Response): Promise<void> {
   try {
-    const item = await service.updateItem(
-      req.params['itemId'] as string,
-      req.body as Record<string, unknown>,
-    );
+    const { title, lat, lng, sourceUrl, note, order } = req.body as {
+      title?: string; lat?: number; lng?: number;
+      sourceUrl?: string; note?: string; order?: number;
+    };
+    const item = await service.updateItem(req.params['itemId'] as string, {
+      title, lat, lng, sourceUrl, note, order,
+    });
     res.json(ok(item));
   } catch {
     res.status(500).json(fail('INTERNAL', 'Internal server error'));
@@ -52,7 +55,9 @@ export async function reorderItems(req: Request, res: Response): Promise<void> {
     const { day, items } = req.body as { day: number; items: { id: string; order: number }[] };
     await service.reorderItems(req.params['tripId'] as string, day, items);
     res.json(ok(null));
-  } catch {
-    res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Item does not belong to this trip'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }

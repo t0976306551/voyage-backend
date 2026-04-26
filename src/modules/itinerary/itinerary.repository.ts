@@ -28,6 +28,13 @@ export class ItineraryRepository {
     return this.repo.count({ where: { tripId, day } });
   }
 
+  async findByIds(ids: string[]): Promise<Itinerary[]> {
+    return this.repo
+      .createQueryBuilder('itinerary')
+      .where('itinerary.id IN (:...ids)', { ids })
+      .getMany();
+  }
+
   async updateOrder(id: string, order: number): Promise<void> {
     await this.repo.update(id, { order });
   }

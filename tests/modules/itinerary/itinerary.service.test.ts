@@ -16,6 +16,10 @@ describe('ItineraryService', () => {
 
   describe('reorderItems', () => {
     it('should update order for each item', async () => {
+      mockRepo.prototype.findByIds.mockResolvedValue([
+        { id: 'item-2', tripId: 'trip-1' } as Itinerary,
+        { id: 'item-1', tripId: 'trip-1' } as Itinerary,
+      ]);
       mockRepo.prototype.updateOrder.mockResolvedValue(undefined);
 
       await service.reorderItems('trip-1', 1, [
@@ -24,6 +28,16 @@ describe('ItineraryService', () => {
       ]);
 
       expect(mockRepo.prototype.updateOrder).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw FORBIDDEN when item belongs to a different trip', async () => {
+      mockRepo.prototype.findByIds.mockResolvedValue([
+        { id: 'item-x', tripId: 'trip-2' } as Itinerary,
+      ]);
+
+      await expect(
+        service.reorderItems('trip-1', 1, [{ id: 'item-x', order: 0 }]),
+      ).rejects.toThrow('FORBIDDEN');
     });
   });
 

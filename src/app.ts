@@ -5,7 +5,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import tripRouter from './modules/trips/trip.router';
-import itineraryRouter from './modules/itinerary/itinerary.router';
 
 dotenv.config();
 
@@ -23,7 +22,6 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/trips', tripRouter);
-app.use('/api/trips/:tripId/itinerary', itineraryRouter);
 
 const PORT = process.env.PORT ?? 4000;
 

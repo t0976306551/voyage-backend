@@ -16,6 +16,15 @@ interface ReorderItemDto {
   order: number;
 }
 
+interface UpdateItemDto {
+  title?: string;
+  lat?: number;
+  lng?: number;
+  sourceUrl?: string;
+  note?: string;
+  order?: number;
+}
+
 export class ItineraryService {
   constructor(private repo: ItineraryRepository) {}
 
@@ -28,7 +37,7 @@ export class ItineraryService {
     return this.repo.create({ ...dto, order: count });
   }
 
-  async updateItem(id: string, data: Partial<CreateItemDto>): Promise<Itinerary> {
+  async updateItem(id: string, data: UpdateItemDto): Promise<Itinerary> {
     return this.repo.update(id, data);
   }
 
@@ -37,10 +46,14 @@ export class ItineraryService {
   }
 
   async reorderItems(
-    _tripId: string,
+    tripId: string,
     _day: number,
     items: ReorderItemDto[],
   ): Promise<void> {
+    const ids = items.map((i) => i.id);
+    const existing = await this.repo.findByIds(ids);
+    const foreignItem = existing.find((e) => e.tripId !== tripId);
+    if (foreignItem) throw new Error('FORBIDDEN');
     await Promise.all(items.map((item) => this.repo.updateOrder(item.id, item.order)));
   }
 }
