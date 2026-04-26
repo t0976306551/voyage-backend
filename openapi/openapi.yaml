@@ -95,3 +95,94 @@ paths:
           description: Updated trip
         '403':
           description: Forbidden
+
+  /api/trips/{tripId}/itinerary:
+    get:
+      summary: Get all itinerary items for a trip
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of itinerary items
+    post:
+      summary: Add itinerary item
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day, title]
+              properties:
+                day:
+                  type: integer
+                title:
+                  type: string
+                lat:
+                  type: number
+                lng:
+                  type: number
+                sourceUrl:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Created item
+
+  /api/trips/{tripId}/itinerary/reorder:
+    patch:
+      summary: Reorder itinerary items for a day
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+
+  /api/trips/{tripId}/itinerary/{itemId}:
+    patch:
+      summary: Update itinerary item
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated item
+    delete:
+      summary: Delete itinerary item
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
