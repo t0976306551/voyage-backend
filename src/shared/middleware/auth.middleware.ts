@@ -2,38 +2,43 @@ import { Request, Response, NextFunction } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { fail } from '../types/response.types';
 
-function base64UrlDecode(str: string): Buffer {
-  const padded = str.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = (4 - (padded.length % 4)) % 4;
-  return Buffer.from(padded + '='.repeat(padding), 'base64');
+function base64UrlDecode(input: string): Buffer {
+  const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  return Buffer.from(padded, 'base64');
 }
 
 function verifyHS256(token: string, secret: string): Record<string, unknown> {
   const parts = token.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT structure');
-  }
+  if (parts.length !== 3) throw new Error('Malformed token');
 
   const [headerB64, payloadB64, signatureB64] = parts;
-  const signingInput = `${headerB64}.${payloadB64}`;
 
+  // C1: Validate algorithm field in header
+  const headerJson = base64UrlDecode(headerB64).toString('utf8');
+  const header = JSON.parse(headerJson) as Record<string, unknown>;
+  if (header['alg'] !== 'HS256') throw new Error('Unsupported algorithm');
+
+  const signingInput = `${headerB64}.${payloadB64}`;
   const expectedSig = createHmac('sha256', secret)
     .update(signingInput)
     .digest('base64url');
 
-  const expectedBuf = Buffer.from(expectedSig);
-  const actualBuf = Buffer.from(signatureB64);
-
+  // Use raw bytes for timing-safe comparison
+  const expectedBytes = Buffer.from(expectedSig, 'base64url');
+  const actualBytes = base64UrlDecode(signatureB64);
   if (
-    expectedBuf.length !== actualBuf.length ||
-    !timingSafeEqual(expectedBuf, actualBuf)
+    expectedBytes.length !== actualBytes.length ||
+    !timingSafeEqual(expectedBytes, actualBytes)
   ) {
     throw new Error('Invalid signature');
   }
 
-  const payload = JSON.parse(base64UrlDecode(payloadB64).toString('utf8')) as Record<string, unknown>;
+  const payloadJson = base64UrlDecode(payloadB64).toString('utf8');
+  const payload = JSON.parse(payloadJson) as Record<string, unknown>;
 
-  if (typeof payload.exp === 'number' && payload.exp < Math.floor(Date.now() / 1000)) {
+  // Check expiry
+  if (typeof payload['exp'] === 'number' && payload['exp'] < Math.floor(Date.now() / 1000)) {
     throw new Error('Token expired');
   }
 
@@ -52,16 +57,30 @@ export async function authMiddleware(
     return;
   }
 
+  // C2: Guard against missing NEXTAUTH_SECRET
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    res.status(500).json(fail('INTERNAL_ERROR', 'Server misconfiguration'));
+    return;
+  }
+
   const token = authHeader.slice(7);
 
   try {
-    const secret = process.env.NEXTAUTH_SECRET ?? '';
     const payload = verifyHS256(token, secret);
 
+    // I2: Runtime validation of required claims
+    const sub = payload['sub'];
+    const email = payload['email'];
+    if (typeof sub !== 'string' || typeof email !== 'string') {
+      res.status(401).json(fail('UNAUTHORIZED', 'Invalid token claims'));
+      return;
+    }
+
     req.user = {
-      id: payload.sub as string,
-      email: payload['email'] as string,
-      name: payload['name'] as string | undefined,
+      id: sub,
+      email,
+      name: typeof payload['name'] === 'string' ? payload['name'] : undefined,
     };
 
     next();
