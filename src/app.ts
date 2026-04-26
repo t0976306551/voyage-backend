@@ -4,6 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { authMiddleware } from './shared/middleware/auth.middleware';
+import { ok } from './shared/types/response.types';
 
 dotenv.config();
 
@@ -19,6 +21,9 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// stub for auth tests — will be replaced by real router in Task 5
+app.get('/api/trips', authMiddleware, (_req, res) => { res.json(ok([])); });
 
 const PORT = process.env.PORT ?? 4000;
 
