@@ -37,4 +37,12 @@ export class TripRepository {
   async findByInviteCode(code: string): Promise<Trip | null> {
     return this.repo.findOne({ where: { inviteCode: code } });
   }
+
+  async isMember(tripId: string, userId: string): Promise<boolean> {
+    const trip = await this.repo.findOne({
+      where: { id: tripId },
+      select: ['id', 'members'],
+    });
+    return trip?.members.some((m) => m.userId === userId) ?? false;
+  }
 }

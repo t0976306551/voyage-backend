@@ -9,6 +9,130 @@ components:
       type: http
       scheme: bearer
 
+  schemas:
+    Expense:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        payerId: { type: string, format: uuid }
+        amount: { type: number, format: float, description: "Total expense amount" }
+        currency: { type: string, example: "TWD" }
+        description: { type: string, nullable: true }
+        splitInfo:
+          type: object
+          additionalProperties: { type: number }
+          description: "Map of userId -> share amount owed by that user (sum should equal amount)"
+        createdAt: { type: string, format: date-time }
+
+    SettlementTransfer:
+      type: object
+      properties:
+        from: { type: string, format: uuid, description: "Debtor user id" }
+        to: { type: string, format: uuid, description: "Creditor user id" }
+        amount: { type: number, format: float }
+
+    Task:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        assignedUserId: { type: string, format: uuid, nullable: true }
+        title: { type: string }
+        category:
+          type: string
+          enum: [general, esim, visa, accommodation, transport]
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        dueDate: { type: string, format: date, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PublicSpot:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        lat: { type: number, nullable: true }
+        lng: { type: number, nullable: true }
+        category:
+          type: string
+          enum: [food, lodging, attraction, activity, transport, admin]
+        coverImage: { type: string, nullable: true }
+        sourceUrl: { type: string, nullable: true }
+        sourcePlatform:
+          type: string
+          enum: [gmaps, instagram, manual]
+        createdById: { type: string, format: uuid }
+        createdByName: { type: string }
+        addedCount: { type: integer }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    TemplateSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        coverImage: { type: string, nullable: true }
+        createdByName: { type: string }
+        itineraryCount: { type: integer }
+
+    TemplateDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        coverImage: { type: string, nullable: true }
+        ownerId: { type: string, format: uuid }
+        ownerName: { type: string }
+        itinerary:
+          type: array
+          items: { $ref: '#/components/schemas/ItineraryItem' }
+
+    ItineraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        day:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        category:
+          type: string
+          enum: [food, lodging, attraction, activity, transport, admin]
+          nullable: true
+          description: Spot category for classification
+        coverImage:
+          type: string
+          nullable: true
+          description: Cover image URL (populated from Instagram OG metadata)
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        order:
+          type: integer
+        sourceUrl:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+
 security:
   - BearerAuth: []
 
@@ -20,6 +144,49 @@ paths:
       responses:
         '200':
           description: OK
+
+  /api/auth/register:
+    post:
+      summary: Register with email and password
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string }
+      responses:
+        '201':
+          description: Created - returns token and user
+        '409': { description: Email already taken }
+        '422': { description: Validation error }
+
+  /api/auth/login:
+    post:
+      summary: Login with email and password
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK - returns token and user
+        '401': { description: Invalid credentials }
+        '422': { description: Validation error }
 
   /api/trips:
     get:
@@ -98,13 +265,19 @@ paths:
 
   /api/trips/{tripId}/itinerary:
     get:
-      summary: Get all itinerary items for a trip
+      summary: Get trip itinerary items
       parameters:
         - name: tripId
           in: path
           required: true
           schema:
             type: string
+        - in: query
+          name: bucket
+          required: false
+          schema:
+            type: boolean
+          description: If true, returns only bucket items (day IS NULL)
       responses:
         '200':
           description: List of itinerary items
@@ -128,6 +301,13 @@ paths:
                   type: integer
                 title:
                   type: string
+                category:
+                  type: string
+                  enum: [food, lodging, attraction, activity, transport, admin]
+                  description: Spot category for classification
+                coverImage:
+                  type: string
+                  description: Cover image URL (populated from Instagram OG metadata)
                 lat:
                   type: number
                 lng:
@@ -139,6 +319,15 @@ paths:
       responses:
         '201':
           description: Created item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ItineraryItem'
+                  error:
+                    nullable: true
 
   /api/trips/{tripId}/itinerary/reorder:
     patch:
@@ -167,9 +356,47 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                day:
+                  type: integer
+                  nullable: true
+                order:
+                  type: integer
+                category:
+                  type: string
+                  enum: [food, lodging, attraction, activity, transport, admin]
+                  description: Spot category for classification
+                coverImage:
+                  type: string
+                  description: Cover image URL (populated from Instagram OG metadata)
+                lat:
+                  type: number
+                lng:
+                  type: number
+                sourceUrl:
+                  type: string
+                note:
+                  type: string
       responses:
         '200':
           description: Updated item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ItineraryItem'
+                  error:
+                    nullable: true
     delete:
       summary: Delete itinerary item
       parameters:
@@ -186,3 +413,491 @@ paths:
       responses:
         '200':
           description: OK
+
+  /api/trips/{tripId}/expenses:
+    get:
+      summary: List expenses for a trip
+      tags: [Expenses]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: List of expenses (sorted by createdAt DESC)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Expense' }
+                  error: { nullable: true }
+    post:
+      summary: Create an expense
+      tags: [Expenses]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payerId, amount, splitInfo]
+              properties:
+                payerId: { type: string, format: uuid }
+                amount: { type: number, minimum: 0.01 }
+                currency: { type: string, default: "TWD" }
+                description: { type: string }
+                splitInfo:
+                  type: object
+                  additionalProperties: { type: number }
+                  description: "Map of userId -> share amount owed (sum should equal amount)"
+      responses:
+        '201':
+          description: Created expense
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Expense' }
+                  error: { nullable: true }
+        '400': { description: Validation error (INVALID_PAYER, INVALID_AMOUNT, INVALID_SPLIT) }
+        '403': { description: Forbidden — Owner or Editor role required }
+
+  /api/trips/{tripId}/expenses/settlement:
+    get:
+      summary: Compute minimal-transfer settlement graph
+      tags: [Expenses]
+      description: |
+        Returns the minimum set of person-to-person transfers that settles all
+        net debts for a trip. Computed greedily by matching the largest creditor
+        with the largest debtor until all balances are within ±0.01.
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: List of recommended transfers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SettlementTransfer' }
+                  error: { nullable: true }
+
+  /api/trips/{tripId}/expenses/{expenseId}:
+    patch:
+      summary: Update an expense
+      tags: [Expenses]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payerId: { type: string, format: uuid }
+                amount: { type: number, minimum: 0.01 }
+                currency: { type: string }
+                description: { type: string }
+                splitInfo:
+                  type: object
+                  additionalProperties: { type: number }
+      responses:
+        '200':
+          description: Updated expense
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Expense' }
+                  error: { nullable: true }
+        '403': { description: Forbidden }
+        '404': { description: Expense not found }
+    delete:
+      summary: Delete an expense
+      tags: [Expenses]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '403': { description: Forbidden }
+        '404': { description: Expense not found }
+
+  /api/trips/{tripId}/tasks:
+    get:
+      summary: List tasks for a trip
+      tags: [Tasks]
+      description: Sorted by dueDate ASC NULLS LAST, then status, then createdAt ASC.
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Task' }
+                  error: { nullable: true }
+    post:
+      summary: Create a task
+      tags: [Tasks]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                category:
+                  type: string
+                  enum: [general, esim, visa, accommodation, transport]
+                  default: general
+                status:
+                  type: string
+                  enum: [todo, in_progress, done]
+                  default: todo
+                assignedUserId: { type: string, format: uuid }
+                dueDate: { type: string, format: date, nullable: true }
+      responses:
+        '201':
+          description: Created task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+                  error: { nullable: true }
+        '400': { description: Validation error (INVALID_TITLE, INVALID_CATEGORY, INVALID_STATUS) }
+        '403': { description: Forbidden — Owner or Editor role required }
+
+  /api/trips/{tripId}/tasks/{taskId}:
+    patch:
+      summary: Update a task
+      tags: [Tasks]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                category:
+                  type: string
+                  enum: [general, esim, visa, accommodation, transport]
+                status:
+                  type: string
+                  enum: [todo, in_progress, done]
+                assignedUserId: { type: string, format: uuid, nullable: true }
+                dueDate: { type: string, format: date, nullable: true }
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+                  error: { nullable: true }
+        '403': { description: Forbidden }
+        '404': { description: Task not found }
+    delete:
+      summary: Delete a task
+      tags: [Tasks]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '403': { description: Forbidden }
+        '404': { description: Task not found }
+
+  /api/trips/{tripId}/import/parse:
+    post:
+      summary: Parse a Google Maps or Instagram URL into a place object
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  example: "https://maps.app.goo.gl/abc123"
+      responses:
+        '200':
+          description: Parsed place data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      lat:
+                        type: number
+                      lng:
+                        type: number
+                      sourceUrl:
+                        type: string
+                  error:
+                    nullable: true
+        '400':
+          description: Invalid URL, not HTTPS, or private host
+        '422':
+          description: Unsupported source or no OG image found
+        '403':
+          description: Not a trip member
+
+  /api/trips/{tripId}/import/publish:
+    post:
+      summary: Parse a URL, create a public_spot, and add it to this trip's bucket (one-shot)
+      description: |
+        Phase 2 design: Smart Imports always become community-visible because the source URL
+        is itself public. Manual itinerary creation stays private — only URL-imported places
+        land in public_spots. Use this endpoint (NOT the regular itinerary POST) when
+        importing from a Google Maps or Instagram URL.
+      tags: [Import]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, example: "https://maps.app.goo.gl/abc123" }
+      responses:
+        '201':
+          description: Created public spot + bucket itinerary item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      publicSpot: { $ref: '#/components/schemas/PublicSpot' }
+                      itineraryItem: { $ref: '#/components/schemas/ItineraryItem' }
+                  error: { nullable: true }
+        '400': { description: Invalid URL or body }
+        '403': { description: Not a trip Owner/Editor }
+        '422': { description: Unsupported source or OG metadata missing }
+
+  /api/trips/{tripId}/publish:
+    patch:
+      summary: Toggle whether this trip is published as a public template
+      tags: [Trips]
+      parameters:
+        - { name: tripId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isPublicTemplate]
+              properties:
+                isPublicTemplate: { type: boolean }
+      responses:
+        '200':
+          description: Updated trip
+        '400': { description: Body must contain isPublicTemplate boolean }
+        '403': { description: Forbidden — Owner role required }
+        '404': { description: Trip not found }
+
+  /api/public-spots:
+    get:
+      summary: List community public spots (sorted by addedCount DESC, createdAt DESC)
+      tags: [PublicSpots]
+      security: []
+      parameters:
+        - { in: query, name: category, schema: { type: string }, required: false }
+        - { in: query, name: limit, schema: { type: integer, default: 50, maximum: 100 }, required: false }
+        - { in: query, name: offset, schema: { type: integer, default: 0 }, required: false }
+      responses:
+        '200':
+          description: List of public spots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicSpot' }
+                  error: { nullable: true }
+    post:
+      summary: Create a public spot (auth required)
+      tags: [PublicSpots]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                lat: { type: number }
+                lng: { type: number }
+                category: { type: string }
+                coverImage: { type: string }
+                sourceUrl: { type: string }
+                sourcePlatform: { type: string, enum: [gmaps, instagram, manual] }
+                note: { type: string }
+      responses:
+        '201':
+          description: Created public spot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PublicSpot' }
+                  error: { nullable: true }
+        '400': { description: INVALID_TITLE }
+        '401': { description: Auth required }
+
+  /api/public-spots/{id}:
+    get:
+      summary: Get single public spot
+      tags: [PublicSpots]
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Public spot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PublicSpot' }
+                  error: { nullable: true }
+        '404': { description: Not found }
+
+  /api/public-spots/{id}/add-to-trip:
+    post:
+      summary: Add this public spot to a trip's bucket (auth + trip member required)
+      tags: [PublicSpots]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tripId]
+              properties:
+                tripId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Created itinerary bucket item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ItineraryItem' }
+                  error: { nullable: true }
+        '400': { description: tripId required }
+        '401': { description: Auth required }
+        '403': { description: Not a trip member }
+        '404': { description: Public spot or trip not found }
+
+  /api/templates:
+    get:
+      summary: List community trip templates
+      tags: [Templates]
+      security: []
+      description: Returns trips where isPublicTemplate=true. Strips members/inviteCode/tasks/expenses.
+      responses:
+        '200':
+          description: List of template summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TemplateSummary' }
+                  error: { nullable: true }
+
+  /api/templates/{id}:
+    get:
+      summary: Get a single template with its full itinerary (no tasks/expenses/members)
+      tags: [Templates]
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Template detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TemplateDetail' }
+                  error: { nullable: true }
+        '404': { description: Not found or not public }
+
+# ────────────────────────────────────────────────────────────
+# Socket.io Events (WebSocket — not REST)
+# ────────────────────────────────────────────────────────────
+# Connection:   ws://<host>/socket.io/
+# Auth:         socket.handshake.auth.token = NextAuth HS256 JWT (same secret as REST Bearer token)
+# Rooms:        trip:<tripId>  (one room per trip)
+#
+# Client → Server:
+#   join_trip(tripId: string)
+#   leave_trip(tripId: string)
+#   itinerary:reorder({ tripId, day, items: [{ id, order }] })
+#   user:editing({ tripId, itemId })
+#
+# Server → Client:
+#   user:joined({ userId, email, tripId })
+#   user:left({ userId, email, tripId })
+#   itinerary:reorder({ tripId, day, items: [{ id, order }] })   ← rebroadcast
+#   user:editing({ tripId, itemId, email })                       ← email injected by server

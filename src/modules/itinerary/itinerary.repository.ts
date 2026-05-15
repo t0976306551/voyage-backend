@@ -1,3 +1,4 @@
+import { IsNull, Not } from 'typeorm';
 import { AppDataSource } from '../../data-source';
 import { Itinerary } from './itinerary.entity';
 
@@ -10,6 +11,13 @@ export class ItineraryRepository {
     return this.repo.save(this.repo.create(data));
   }
 
+  async findByTrip(tripId: string): Promise<Itinerary[]> {
+    return this.repo.find({
+      where: { tripId, day: Not(IsNull()) },
+      order: { day: 'ASC', order: 'ASC' },
+    });
+  }
+
   async findByTripAndDay(tripId: string, day: number): Promise<Itinerary[]> {
     return this.repo.find({
       where: { tripId, day },
@@ -17,10 +25,10 @@ export class ItineraryRepository {
     });
   }
 
-  async findByTrip(tripId: string): Promise<Itinerary[]> {
+  async findBucket(tripId: string): Promise<Itinerary[]> {
     return this.repo.find({
-      where: { tripId },
-      order: { day: 'ASC', order: 'ASC' },
+      where: { tripId, day: IsNull() },
+      order: { order: 'ASC' },
     });
   }
 
@@ -28,7 +36,12 @@ export class ItineraryRepository {
     return this.repo.count({ where: { tripId, day } });
   }
 
+  async countBucket(tripId: string): Promise<number> {
+    return this.repo.count({ where: { tripId, day: IsNull() } });
+  }
+
   async findByIds(ids: string[]): Promise<Itinerary[]> {
+    if (ids.length === 0) return [];
     return this.repo
       .createQueryBuilder('itinerary')
       .where('itinerary.id IN (:...ids)', { ids })

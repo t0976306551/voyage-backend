@@ -32,6 +32,13 @@ export class Trip {
   @Column({ type: 'jsonb', default: '[]' })
   members!: TripMember[];
 
+  @Column({
+    name: 'enabled_modules',
+    type: 'jsonb',
+    default: () => `'{"tasks":true,"expenses":true,"checklists":true}'`,
+  })
+  enabledModules!: { tasks: boolean; expenses: boolean; checklists: boolean };
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
