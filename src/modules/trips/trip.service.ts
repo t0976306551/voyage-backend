@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 import { In } from 'typeorm';
 import { AppDataSource } from '../../data-source';
 import { User } from '../users/user.entity';
-import { Trip, TripMember } from './trip.entity';
+import { Trip, TripMember, CollaboratorPermissions, DEFAULT_COLLABORATOR_PERMISSIONS } from './trip.entity';
 import { TripRepository } from './trip.repository';
 
 function generateInviteCode(): string {
@@ -17,6 +17,15 @@ export interface HydratedMember extends TripMember {
 
 export interface HydratedTrip extends Omit<Trip, 'members'> {
   members: HydratedMember[];
+}
+
+export interface TripPreview {
+  id: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+  ownerName: string;
+  memberCount: number;
 }
 
 async function hydrateMembers(trip: Trip): Promise<HydratedTrip> {
@@ -53,6 +62,7 @@ interface UpdateTripDto {
   startDate?: string;
   endDate?: string;
   coverImage?: string;
+  collaboratorPermissions?: CollaboratorPermissions;
 }
 
 export class TripService {
@@ -101,6 +111,18 @@ export class TripService {
     return hydrateMembers(updated);
   }
 
+  async setCollaboratorPermissions(
+    tripId: string,
+    patch: Partial<CollaboratorPermissions>,
+  ): Promise<HydratedTrip> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+    const current = trip.collaboratorPermissions ?? DEFAULT_COLLABORATOR_PERMISSIONS;
+    const merged = { ...current, ...patch };
+    const updated = await this.repo.update(tripId, { collaboratorPermissions: merged });
+    return hydrateMembers(updated);
+  }
+
   async joinByInviteCode(code: string, userId: string): Promise<Trip> {
     const trip = await this.repo.findByInviteCode(code);
     if (!trip) throw new Error('NOT_FOUND');
@@ -108,7 +130,77 @@ export class TripService {
     const alreadyMember = trip.members.some((m) => m.userId === userId);
     if (alreadyMember) return trip;
 
-    const updatedMembers = [...trip.members, { userId, role: 'Viewer' as const }];
+    const updatedMembers = [...trip.members, { userId, role: 'Editor' as const }];
     return this.repo.update(trip.id, { members: updatedMembers });
+  }
+
+  async removeMember(tripId: string, targetUserId: string): Promise<HydratedTrip> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+
+    const target = trip.members.find((m) => m.userId === targetUserId);
+    if (!target) throw new Error('NOT_MEMBER');
+    if (target.role === 'Owner') throw new Error('CANNOT_KICK_OWNER');
+
+    const updatedMembers = trip.members.filter((m) => m.userId !== targetUserId);
+    const updated = await this.repo.update(tripId, { members: updatedMembers });
+    return hydrateMembers(updated);
+  }
+
+  async leaveTrip(tripId: string, userId: string): Promise<void> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+
+    const member = trip.members.find((m) => m.userId === userId);
+    if (!member) throw new Error('NOT_MEMBER');
+    if (member.role === 'Owner') throw new Error('CANNOT_LEAVE_AS_OWNER');
+
+    const updatedMembers = trip.members.filter((m) => m.userId !== userId);
+    await this.repo.update(tripId, { members: updatedMembers });
+  }
+
+  async getTripPreviewByCode(code: string): Promise<TripPreview> {
+    const trip = await this.repo.findByInviteCode(code);
+    if (!trip) throw new Error('NOT_FOUND');
+    return this._buildPreview(trip);
+  }
+
+  async getTripPreviewById(tripId: string): Promise<TripPreview> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+    return this._buildPreview(trip);
+  }
+
+  async joinByTripId(tripId: string, userId: string): Promise<HydratedTrip> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+
+    const alreadyMember = trip.members.some((m) => m.userId === userId);
+    if (alreadyMember) return hydrateMembers(trip);
+
+    const updatedMembers = [...trip.members, { userId, role: 'Editor' as const }];
+    const updated = await this.repo.update(tripId, { members: updatedMembers });
+    return hydrateMembers(updated);
+  }
+
+  private async _buildPreview(trip: Trip): Promise<TripPreview> {
+    const ownerMember = trip.members.find((m) => m.role === 'Owner');
+    let ownerName = '未知';
+    if (ownerMember) {
+      const users = await AppDataSource.getRepository(User).find({
+        where: { id: ownerMember.userId },
+        select: ['name', 'email'],
+      });
+      const owner = users[0];
+      ownerName = owner?.name || owner?.email?.split('@')[0] || '未知';
+    }
+    return {
+      id: trip.id,
+      title: trip.title,
+      startDate: trip.startDate ?? undefined,
+      endDate: trip.endDate ?? undefined,
+      ownerName,
+      memberCount: trip.members.length,
+    };
   }
 }

@@ -58,6 +58,10 @@ export async function updateChecklist(req: Request, res: Response): Promise<void
 
 export async function deleteChecklist(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canDeleteContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const itemId = req.params['itemId'] as string;
     await service.delete(itemId, tripId, req.user!.id);

@@ -3,6 +3,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { verifyHS256 } from '../shared/utils/jwt.utils';
 import { registerSocketHandlers } from './socket.handlers';
 import { setIO } from './broadcaster';
+import { registerSocket, unregisterSocket } from './socket.registry';
 
 interface SocketInitOpts {
   checkMembership?: (userId: string, tripId: string) => Promise<boolean>;
@@ -40,6 +41,13 @@ export function initSocketIO(httpServer: HttpServer, opts?: SocketInitOpts): Soc
   });
 
   io.on('connection', (socket: Socket) => {
+    const userId = socket.data.userId as string;
+    if (userId) {
+      registerSocket(userId, socket.id);
+      socket.on('disconnect', () => {
+        unregisterSocket(userId, socket.id);
+      });
+    }
     registerSocketHandlers(io, socket, opts?.checkMembership);
   });
 

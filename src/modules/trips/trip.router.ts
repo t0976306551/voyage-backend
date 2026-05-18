@@ -1,7 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../../shared/middleware/auth.middleware';
 import { requireTripRole } from '../../shared/middleware/permission.middleware';
-import { getMyTrips, getTripById, createTrip, updateTrip, joinByInviteCode, patchModules } from './trip.controller';
+import {
+  getMyTrips, getTripById, createTrip, updateTrip, joinByInviteCode, patchModules,
+  removeMember, getTripPreviewByCode, getTripPreviewById, joinByTripId, leaveTrip,
+  patchCollaboratorPermissions,
+} from './trip.controller';
 import { coverUploadMiddleware, coverUploadErrorHandler, uploadTripCover } from './trip-cover.controller';
 import itineraryRouter from '../itinerary/itinerary.router';
 import expensesRouter from '../expenses/expenses.router';
@@ -22,9 +26,15 @@ router.use(authMiddleware);
 router.get('/', getMyTrips);
 router.post('/', createTrip);
 router.post('/join', joinByInviteCode);
+router.get('/preview', getTripPreviewByCode);
+router.get('/:tripId/preview', getTripPreviewById);
+router.post('/:tripId/join', joinByTripId);
 router.get('/:tripId', getTripById);
 router.patch('/:tripId', requireTripRole('Owner', 'Editor'), updateTrip);
-router.patch('/:tripId/modules', requireTripRole('Owner'), patchModules);
+router.patch('/:tripId/modules', requireTripRole('Owner', 'Editor'), patchModules);
+router.patch('/:tripId/collaborator-permissions', requireTripRole('Owner'), patchCollaboratorPermissions);
+router.delete('/:tripId/members/me', leaveTrip);
+router.delete('/:tripId/members/:userId', requireTripRole('Owner'), removeMember);
 router.post(
   '/:tripId/cover',
   requireTripRole('Owner', 'Editor'),
@@ -41,8 +51,11 @@ router.use('/:tripId/checklists', checklistsRouter);
 // POST /api/trips/:tripId/invitations — Owner invites user by handle
 router.post(
   '/:tripId/invitations',
-  requireTripRole('Owner'),
+  requireTripRole('Owner', 'Editor'),
   async (req: Request, res: Response) => {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canInvite) {
+      return void res.status(403).json({ error: 'FORBIDDEN' });
+    }
     const handle = typeof req.body?.handle === 'string' ? req.body.handle.trim().toUpperCase() : null;
     if (!handle) return void res.status(400).json({ error: 'MISSING_HANDLE' });
 

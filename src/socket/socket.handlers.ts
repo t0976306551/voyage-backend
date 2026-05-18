@@ -29,49 +29,38 @@ export function registerSocketHandlers(
 ): void {
   const userId = socket.data.userId as string;
   const email = socket.data.email as string;
-  const joinedTrips = new Set<string>(); // per-connection cache
 
   socket.on('join_trip', async (tripId: unknown) => {
     if (typeof tripId !== 'string' || !tripId.trim()) return;
 
-    if (joinedTrips.has(tripId)) {
-      void socket.join(`trip:${tripId}`);
-      return;
-    }
-
     try {
-      const ok = await checkMembership(userId, tripId);
+      const ok = checkMembership ? await checkMembership(userId, tripId) : true;
       if (!ok) {
+        socket.leave(`trip:${tripId}`);
         socket.emit('error', { code: 'FORBIDDEN', message: 'Not a trip member' });
         return;
       }
-      joinedTrips.add(tripId);
       void socket.join(`trip:${tripId}`);
       socket.to(`trip:${tripId}`).emit('user:joined', { userId, email, tripId });
     } catch {
-      socket.emit('error', { code: 'INTERNAL' });
+      socket.emit('error', { code: 'INTERNAL', message: 'Internal error' });
     }
   });
 
   socket.on('leave_trip', (tripId: unknown) => {
     if (typeof tripId !== 'string') return;
-    joinedTrips.delete(tripId);
     void socket.leave(`trip:${tripId}`);
     socket.to(`trip:${tripId}`).emit('user:left', { userId, email, tripId });
   });
 
-  // Presence-only relays (non-data, still validate membership via cache)
+  // Presence-only relays — guard using actual socket room membership
   socket.on('itinerary:reorder', (data: ReorderPayload) => {
-    if (!joinedTrips.has(data?.tripId)) return;
+    if (!socket.rooms.has(`trip:${data?.tripId}`)) return;
     socket.to(`trip:${data.tripId}`).emit('itinerary:reorder', data);
   });
 
   socket.on('user:editing', (data: EditingPayload) => {
-    if (!joinedTrips.has(data?.tripId)) return;
+    if (!socket.rooms.has(`trip:${data?.tripId}`)) return;
     socket.to(`trip:${data.tripId}`).emit('user:editing', { ...data, email });
-  });
-
-  socket.on('disconnect', () => {
-    joinedTrips.clear();
   });
 }

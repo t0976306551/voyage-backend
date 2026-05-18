@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../../data-source';
-import { Trip, TripRole } from '../../modules/trips/trip.entity';
+import { Trip, TripRole, DEFAULT_COLLABORATOR_PERMISSIONS } from '../../modules/trips/trip.entity';
 import { fail } from '../types/response.types';
 
 export function requireTripRole(...roles: TripRole[]) {
@@ -28,6 +28,8 @@ export function requireTripRole(...roles: TripRole[]) {
       return;
     }
 
+    req.tripRole = member.role;
+    req.collaboratorPermissions = trip.collaboratorPermissions ?? DEFAULT_COLLABORATOR_PERMISSIONS;
     next();
   };
 }

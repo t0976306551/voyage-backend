@@ -138,6 +138,10 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
 
 export async function deleteItem(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canDeleteContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     await service.deleteItem(req.params['itemId'] as string);
     broadcastToTrip(tripId, 'itinerary:changed', { tripId });

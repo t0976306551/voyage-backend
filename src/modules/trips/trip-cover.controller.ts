@@ -40,6 +40,10 @@ const service = new TripService(new TripRepository());
 
 export async function uploadTripCover(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditTripInfo) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const file = (req as Request & { file?: Express.Multer.File }).file;
     if (!file) {
