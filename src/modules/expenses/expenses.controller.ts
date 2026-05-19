@@ -107,3 +107,29 @@ export async function getSettlement(req: Request, res: Response): Promise<void> 
     res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
+
+export async function togglePaid(req: Request, res: Response): Promise<void> {
+  try {
+    const tripId = req.params['tripId'] as string;
+    const id = req.params['expenseId'] as string;
+    const body = req.body as { userId?: string; paid?: boolean };
+    if (!body.userId || typeof body.userId !== 'string') {
+      res.status(400).json(fail('INVALID_USER', 'userId is required'));
+      return;
+    }
+    if (typeof body.paid !== 'boolean') {
+      res.status(400).json(fail('INVALID_PAID', 'paid must be a boolean'));
+      return;
+    }
+    const item = await service.togglePaid(id, tripId, body.userId, body.paid);
+    broadcastToTrip(tripId, 'expense:changed', { tripId });
+    res.json(ok(item));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Expense not found'));
+    else if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Expense does not belong to this trip'));
+    else if (msg === 'PAYER_CANNOT_BE_MARKED') res.status(400).json(fail('PAYER_CANNOT_BE_MARKED', 'Payer is not in the debt list'));
+    else if (msg === 'NOT_IN_SPLIT') res.status(400).json(fail('NOT_IN_SPLIT', 'User is not part of this expense split'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  }
+}

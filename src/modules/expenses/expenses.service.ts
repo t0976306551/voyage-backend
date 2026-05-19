@@ -56,6 +56,22 @@ export class ExpensesService {
     return this.repo.delete(id);
   }
 
+  /** Mark a non-payer's share as paid back (or undo). Payer never gets tracked here. */
+  async togglePaid(id: string, tripId: string, userId: string, paid: boolean): Promise<Expense> {
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new Error('NOT_FOUND');
+    if (existing.tripId !== tripId) throw new Error('FORBIDDEN');
+    if (userId === existing.payerId) throw new Error('PAYER_CANNOT_BE_MARKED');
+    if (!(userId in (existing.splitInfo ?? {}))) throw new Error('NOT_IN_SPLIT');
+    const next: Record<string, string> = { ...(existing.paidBack ?? {}) };
+    if (paid) {
+      next[userId] = new Date().toISOString();
+    } else {
+      delete next[userId];
+    }
+    return this.repo.update(id, { paidBack: next });
+  }
+
   /**
    * Compute minimal-transfer settlement for a trip.
    * Net balance per user = (sum paid) - (sum owed via splitInfo).
