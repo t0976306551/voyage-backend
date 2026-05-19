@@ -28,6 +28,9 @@ export class Task {
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate!: string;
 
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

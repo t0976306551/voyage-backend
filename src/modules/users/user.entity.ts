@@ -10,6 +10,9 @@ export class User {
   @Column({ unique: true })
   email!: string;
 
+  @Column({ unique: true, length: 10 })
+  handle!: string;
+
   @Column({ nullable: true })
   name!: string;
 
@@ -24,6 +27,15 @@ export class User {
 
   @Column({ nullable: true, name: 'push_token' })
   pushToken!: string;
+
+  @Column({ type: 'varchar', nullable: true, name: 'password_hash', length: 72 })
+  passwordHash!: string | null;
+
+  @Column({ name: 'email_verified', default: false })
+  emailVerified!: boolean;
+
+  @Column('text', { array: true, name: 'auth_providers', default: '{}' })
+  authProviders!: string[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

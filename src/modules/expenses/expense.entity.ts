@@ -25,6 +25,10 @@ export class Expense {
   @Column({ name: 'split_info', type: 'jsonb', default: '{}' })
   splitInfo!: Record<string, number>;
 
+  /** Map of userId → ISO timestamp when they marked themselves paid back. Absent = not yet paid. */
+  @Column({ name: 'paid_back', type: 'jsonb', default: '{}' })
+  paidBack!: Record<string, string>;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

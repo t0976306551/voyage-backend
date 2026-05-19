@@ -9,6 +9,22 @@ export interface TripMember {
   role: TripRole;
 }
 
+export interface CollaboratorPermissions {
+  canEditTripInfo: boolean;
+  canInvite: boolean;
+  canDeleteContent: boolean;
+  canManageModules: boolean;
+  canEditContent: boolean;
+}
+
+export const DEFAULT_COLLABORATOR_PERMISSIONS: CollaboratorPermissions = {
+  canEditTripInfo: true,
+  canInvite: true,
+  canDeleteContent: true,
+  canManageModules: true,
+  canEditContent: true,
+};
+
 @Entity('trips')
 export class Trip {
   @PrimaryGeneratedColumn('uuid')
@@ -31,6 +47,20 @@ export class Trip {
 
   @Column({ type: 'jsonb', default: '[]' })
   members!: TripMember[];
+
+  @Column({
+    name: 'enabled_modules',
+    type: 'jsonb',
+    default: () => `'{"tasks":true,"expenses":true,"checklists":true}'`,
+  })
+  enabledModules!: { tasks: boolean; expenses: boolean; checklists: boolean };
+
+  @Column({
+    name: 'collaborator_permissions',
+    type: 'jsonb',
+    default: () => `'{"canEditTripInfo":true,"canInvite":true,"canDeleteContent":true,"canManageModules":true,"canEditContent":true}'`,
+  })
+  collaboratorPermissions!: CollaboratorPermissions;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

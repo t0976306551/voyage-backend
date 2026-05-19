@@ -17,8 +17,8 @@ describe('ItineraryService', () => {
   describe('reorderItems', () => {
     it('should update order for each item', async () => {
       mockRepo.prototype.findByIds.mockResolvedValue([
-        { id: 'item-2', tripId: 'trip-1' } as Itinerary,
-        { id: 'item-1', tripId: 'trip-1' } as Itinerary,
+        { id: 'item-2', tripId: 'trip-1', day: 1 } as Itinerary,
+        { id: 'item-1', tripId: 'trip-1', day: 1 } as Itinerary,
       ]);
       mockRepo.prototype.updateOrder.mockResolvedValue(undefined);
 
@@ -32,7 +32,7 @@ describe('ItineraryService', () => {
 
     it('should throw FORBIDDEN when item belongs to a different trip', async () => {
       mockRepo.prototype.findByIds.mockResolvedValue([
-        { id: 'item-x', tripId: 'trip-2' } as Itinerary,
+        { id: 'item-x', tripId: 'trip-2', day: 1 } as Itinerary,
       ]);
 
       await expect(
@@ -53,6 +53,38 @@ describe('ItineraryService', () => {
       });
 
       expect(result.order).toBe(3);
+    });
+
+    it('should forward category and coverImage to repo.create', async () => {
+      const mockItem = { id: '1', tripId: 't1', day: null, title: 'Cafe X', category: 'food', coverImage: 'https://img.com/a.jpg', order: 0 };
+      mockRepo.prototype.countBucket.mockResolvedValue(0);
+      mockRepo.prototype.create.mockResolvedValue(mockItem as any);
+
+      await service.createItem({
+        tripId: 't1',
+        day: null,
+        title: 'Cafe X',
+        category: 'food',
+        coverImage: 'https://img.com/a.jpg',
+      });
+
+      expect(mockRepo.prototype.create).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'food', coverImage: 'https://img.com/a.jpg' }),
+      );
+    });
+  });
+
+  describe('updateItem', () => {
+    it('should forward category and coverImage to repo.update', async () => {
+      const mockItem = { id: 'item1', tripId: 't1', day: 1, title: 'Updated', category: 'lodging', coverImage: null, order: 0 };
+      mockRepo.prototype.update.mockResolvedValue(mockItem as any);
+
+      await service.updateItem('item1', { category: 'lodging', coverImage: undefined });
+
+      expect(mockRepo.prototype.update).toHaveBeenCalledWith(
+        'item1',
+        expect.objectContaining({ category: 'lodging' }),
+      );
     });
   });
 });

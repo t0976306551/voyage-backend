@@ -7,7 +7,7 @@ const router = Router({ mergeParams: true });
 
 router.use(authMiddleware);
 
-router.get('/', getItinerary);
+router.get('/', requireTripRole('Owner', 'Editor', 'Viewer'), getItinerary);
 router.post('/', requireTripRole('Owner', 'Editor'), createItem);
 router.patch('/reorder', requireTripRole('Owner', 'Editor'), reorderItems);
 router.patch('/:itemId', requireTripRole('Owner', 'Editor'), updateItem);
