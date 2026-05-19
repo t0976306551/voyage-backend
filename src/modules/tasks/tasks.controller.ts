@@ -29,6 +29,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
       status?: TaskStatus;
       assignedUserId?: string;
       dueDate?: string | null;
+      notes?: string | null;
     };
     if (!body.title || typeof body.title !== 'string' || body.title.trim().length === 0) {
       res.status(400).json(fail('INVALID_TITLE', 'title is required'));
@@ -49,6 +50,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
       status: body.status,
       assignedUserId: body.assignedUserId,
       dueDate: body.dueDate ?? null,
+      notes: body.notes ?? null,
     });
     broadcastToTrip(tripId, 'task:changed', { tripId });
     res.status(201).json(ok(item));
@@ -67,6 +69,7 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
       status?: TaskStatus;
       assignedUserId?: string | null;
       dueDate?: string | null;
+      notes?: string | null;
     };
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category'));

@@ -8,6 +8,7 @@ export interface CreateTaskDto {
   status?: TaskStatus;
   assignedUserId?: string;
   dueDate?: string | null;
+  notes?: string | null;
 }
 
 export interface UpdateTaskDto {
@@ -16,6 +17,7 @@ export interface UpdateTaskDto {
   status?: TaskStatus;
   assignedUserId?: string | null;
   dueDate?: string | null;
+  notes?: string | null;
 }
 
 export class TasksService {
@@ -33,6 +35,7 @@ export class TasksService {
       status: dto.status ?? 'todo',
       ...(dto.assignedUserId !== undefined ? { assignedUserId: dto.assignedUserId } : {}),
       ...(dto.dueDate !== undefined ? { dueDate: dto.dueDate ?? undefined } : {}),
+      ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
     } as Partial<Task>);
   }
 
