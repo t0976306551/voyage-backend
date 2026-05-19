@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { UserRepository } from './user.repository';
 import { InvitationRepository } from '../invitations/invitation.repository';
 import { TripRepository } from '../trips/trip.repository';
@@ -27,7 +28,43 @@ userRouter.get('/me', async (req: Request, res: Response) => {
     name: user.name,
     handle: user.handle,
     avatar: user.avatar,
+    hasPassword: !!user.passwordHash,
+    authProviders: user.authProviders ?? [],
   });
+});
+
+// POST /api/users/me/password — change own password (credentials accounts only)
+userRouter.post('/me/password', async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+
+  if (!currentPassword || !newPassword) {
+    return void res.status(422).json({ error: 'VALIDATION_ERROR', message: '請填寫舊密碼與新密碼' });
+  }
+  if (newPassword.length < 8) {
+    return void res.status(422).json({ error: 'VALIDATION_ERROR', message: '新密碼至少 8 個字元' });
+  }
+  if (newPassword === currentPassword) {
+    return void res.status(422).json({ error: 'VALIDATION_ERROR', message: '新密碼不可與舊密碼相同' });
+  }
+
+  const user = await userRepo.findById(req.user!.id);
+  if (!user) return void res.status(404).json({ error: 'NOT_FOUND' });
+
+  if (!user.passwordHash) {
+    return void res.status(409).json({ error: 'NO_PASSWORD_SET', message: '此帳號未設定密碼（透過第三方登入），無法修改' });
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    return void res.status(401).json({ error: 'INVALID_CURRENT_PASSWORD', message: '舊密碼不正確' });
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  await userRepo.update(user.id, { passwordHash: newHash });
+  res.json({ ok: true });
 });
 
 // GET /api/users/search?handle=vs_XXXXX
