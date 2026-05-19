@@ -59,11 +59,17 @@ export class ItineraryService {
     return this.repo.create({ ...dto, order });
   }
 
-  async updateItem(id: string, data: UpdateItemDto): Promise<Itinerary> {
+  async updateItem(id: string, tripId: string, data: UpdateItemDto): Promise<Itinerary> {
+    const existing = (await this.repo.findByIds([id]))[0];
+    if (!existing) throw new Error('NOT_FOUND');
+    if (existing.tripId !== tripId) throw new Error('FORBIDDEN');
     return this.repo.update(id, data);
   }
 
-  async deleteItem(id: string): Promise<void> {
+  async deleteItem(id: string, tripId: string): Promise<void> {
+    const existing = (await this.repo.findByIds([id]))[0];
+    if (!existing) throw new Error('NOT_FOUND');
+    if (existing.tripId !== tripId) throw new Error('FORBIDDEN');
     return this.repo.delete(id);
   }
 

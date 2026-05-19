@@ -136,11 +136,15 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
       res.status(400).json(fail(code!, error));
       return;
     }
-    const item = await service.updateItem(req.params['itemId'] as string, body);
+    const tripId = req.params['tripId'] as string;
+    const item = await service.updateItem(req.params['itemId'] as string, tripId, body);
     broadcastToTrip(item.tripId, 'itinerary:changed', { tripId: item.tripId });
     res.json(ok(item));
-  } catch {
-    res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Itinerary item not found'));
+    else if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Item does not belong to this trip'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
 
@@ -151,11 +155,14 @@ export async function deleteItem(req: Request, res: Response): Promise<void> {
       return;
     }
     const tripId = req.params['tripId'] as string;
-    await service.deleteItem(req.params['itemId'] as string);
+    await service.deleteItem(req.params['itemId'] as string, tripId);
     broadcastToTrip(tripId, 'itinerary:changed', { tripId });
     res.json(ok(null));
-  } catch {
-    res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Itinerary item not found'));
+    else if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Item does not belong to this trip'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
 

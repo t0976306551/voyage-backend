@@ -14,8 +14,8 @@ const router = Router({ mergeParams: true });
 
 router.use(authMiddleware);
 
-router.get('/', listExpenses);
-router.get('/settlement', getSettlement);
+router.get('/', requireTripRole('Owner', 'Editor', 'Viewer'), listExpenses);
+router.get('/settlement', requireTripRole('Owner', 'Editor', 'Viewer'), getSettlement);
 router.post('/', requireTripRole('Owner', 'Editor'), createExpense);
 router.patch('/:expenseId', requireTripRole('Owner', 'Editor'), updateExpense);
 router.delete('/:expenseId', requireTripRole('Owner', 'Editor'), deleteExpense);

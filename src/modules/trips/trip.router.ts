@@ -36,7 +36,7 @@ router.patch('/:tripId', requireTripRole('Owner', 'Editor'), updateTrip);
 router.patch('/:tripId/modules', requireTripRole('Owner', 'Editor'), patchModules);
 router.patch('/:tripId/collaborator-permissions', requireTripRole('Owner'), patchCollaboratorPermissions);
 router.get('/:tripId/leave-preview', requireTripRole('Owner', 'Editor', 'Viewer'), getLeavePreview);
-router.delete('/:tripId/members/me', leaveTrip);
+router.delete('/:tripId/members/me', requireTripRole('Owner', 'Editor', 'Viewer'), leaveTrip);
 router.delete('/:tripId/members/:userId', requireTripRole('Owner'), removeMember);
 router.post(
   '/:tripId/cover',
