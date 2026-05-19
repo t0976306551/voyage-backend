@@ -18,10 +18,8 @@ export async function listExpenses(req: Request, res: Response): Promise<void> {
 
 export async function createExpense(req: Request, res: Response): Promise<void> {
   try {
-    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
-      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
-      return;
-    }
+    // 新增內容：Owner 或 Editor 永遠可以做（不檢查 canEditContent）。
+    // 角色檢查已在 router 的 requireTripRole('Owner','Editor') 完成。
     const tripId = req.params['tripId'] as string;
     const body = req.body as {
       payerId?: string;

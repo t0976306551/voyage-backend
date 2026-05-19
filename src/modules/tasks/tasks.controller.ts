@@ -22,10 +22,8 @@ export async function listTasks(req: Request, res: Response): Promise<void> {
 
 export async function createTask(req: Request, res: Response): Promise<void> {
   try {
-    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
-      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
-      return;
-    }
+    // 新增內容：Owner 或 Editor 永遠可以做（不檢查 canEditContent）。
+    // 角色檢查已在 router 的 requireTripRole('Owner','Editor') 完成。
     const tripId = req.params['tripId'] as string;
     const body = req.body as {
       title?: string;
@@ -65,10 +63,6 @@ export async function createTask(req: Request, res: Response): Promise<void> {
 
 export async function updateTask(req: Request, res: Response): Promise<void> {
   try {
-    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
-      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
-      return;
-    }
     const tripId = req.params['tripId'] as string;
     const id = req.params['taskId'] as string;
     const body = req.body as {
@@ -79,6 +73,14 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
       dueDate?: string | null;
       notes?: string | null;
     };
+    // status-only 更新（例如「打勾完成」）視為自我進度管理，任何成員可做。
+    // 其他欄位（title/category/assignedUserId/dueDate/notes）才視為內容編輯，需 canEditContent。
+    const keys = Object.keys(body).filter((k) => (body as Record<string, unknown>)[k] !== undefined);
+    const isStatusOnly = keys.length === 1 && keys[0] === 'status';
+    if (!isStatusOnly && req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category'));
       return;
