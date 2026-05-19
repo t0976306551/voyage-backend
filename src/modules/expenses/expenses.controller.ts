@@ -18,6 +18,10 @@ export async function listExpenses(req: Request, res: Response): Promise<void> {
 
 export async function createExpense(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const body = req.body as {
       payerId?: string;
@@ -55,6 +59,10 @@ export async function createExpense(req: Request, res: Response): Promise<void> 
 
 export async function updateExpense(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const id = req.params['expenseId'] as string;
     const body = req.body as {

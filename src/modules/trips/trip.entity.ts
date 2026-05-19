@@ -14,6 +14,7 @@ export interface CollaboratorPermissions {
   canInvite: boolean;
   canDeleteContent: boolean;
   canManageModules: boolean;
+  canEditContent: boolean;
 }
 
 export const DEFAULT_COLLABORATOR_PERMISSIONS: CollaboratorPermissions = {
@@ -21,6 +22,7 @@ export const DEFAULT_COLLABORATOR_PERMISSIONS: CollaboratorPermissions = {
   canInvite: true,
   canDeleteContent: true,
   canManageModules: true,
+  canEditContent: true,
 };
 
 @Entity('trips')
@@ -56,7 +58,7 @@ export class Trip {
   @Column({
     name: 'collaborator_permissions',
     type: 'jsonb',
-    default: () => `'{"canEditTripInfo":true,"canInvite":true,"canDeleteContent":true,"canManageModules":true}'`,
+    default: () => `'{"canEditTripInfo":true,"canInvite":true,"canDeleteContent":true,"canManageModules":true,"canEditContent":true}'`,
   })
   collaboratorPermissions!: CollaboratorPermissions;
 

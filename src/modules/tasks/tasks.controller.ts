@@ -22,6 +22,10 @@ export async function listTasks(req: Request, res: Response): Promise<void> {
 
 export async function createTask(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const body = req.body as {
       title?: string;
@@ -61,6 +65,10 @@ export async function createTask(req: Request, res: Response): Promise<void> {
 
 export async function updateTask(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const id = req.params['taskId'] as string;
     const body = req.body as {

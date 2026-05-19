@@ -67,6 +67,10 @@ export async function getItinerary(req: Request, res: Response): Promise<void> {
 
 export async function createItem(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const body = req.body as {
       day?: number | null;
       title?: string;
@@ -113,6 +117,10 @@ export async function createItem(req: Request, res: Response): Promise<void> {
 
 export async function updateItem(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const body = req.body as {
       title?: string; category?: SpotCategory; coverImage?: string;
       lat?: number; lng?: number;
@@ -153,6 +161,10 @@ export async function deleteItem(req: Request, res: Response): Promise<void> {
 
 export async function reorderItems(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const { day, items } = req.body as {
       day: number | null;

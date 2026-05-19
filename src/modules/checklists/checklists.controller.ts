@@ -20,6 +20,10 @@ export async function listChecklists(req: Request, res: Response): Promise<void>
 
 export async function createChecklist(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const body = req.body as { title?: string; notes?: string | null; assigneeIds?: string[] };
     const item = await service.create({
@@ -41,6 +45,10 @@ export async function createChecklist(req: Request, res: Response): Promise<void
 
 export async function updateChecklist(req: Request, res: Response): Promise<void> {
   try {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canEditContent) {
+      res.status(403).json(fail('FORBIDDEN', 'Insufficient permission'));
+      return;
+    }
     const tripId = req.params['tripId'] as string;
     const itemId = req.params['itemId'] as string;
     const body = req.body as { title?: string; notes?: string | null; assigneeIds?: string[] };

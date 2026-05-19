@@ -123,7 +123,7 @@ export async function patchCollaboratorPermissions(req: Request, res: Response):
     const tripId = req.params['tripId'] as string;
     const body = req.body as Partial<CollaboratorPermissions>;
     const patch: Partial<CollaboratorPermissions> = {};
-    for (const k of ['canEditTripInfo', 'canInvite', 'canDeleteContent', 'canManageModules'] as const) {
+    for (const k of ['canEditTripInfo', 'canInvite', 'canDeleteContent', 'canManageModules', 'canEditContent'] as const) {
       const v = body[k];
       if (v !== undefined) {
         if (typeof v !== 'boolean') {
