@@ -112,16 +112,14 @@ export async function togglePaid(req: Request, res: Response): Promise<void> {
   try {
     const tripId = req.params['tripId'] as string;
     const id = req.params['expenseId'] as string;
-    const body = req.body as { userId?: string; paid?: boolean };
-    if (!body.userId || typeof body.userId !== 'string') {
-      res.status(400).json(fail('INVALID_USER', 'userId is required'));
-      return;
-    }
+    const body = req.body as { paid?: boolean };
     if (typeof body.paid !== 'boolean') {
       res.status(400).json(fail('INVALID_PAID', 'paid must be a boolean'));
       return;
     }
-    const item = await service.togglePaid(id, tripId, body.userId, body.paid);
+    // Always toggle for the authenticated user — no one can mark on behalf of others
+    const callerId = req.user!.id;
+    const item = await service.togglePaid(id, tripId, callerId, body.paid);
     broadcastToTrip(tripId, 'expense:changed', { tripId });
     res.json(ok(item));
   } catch (e: unknown) {
@@ -129,7 +127,7 @@ export async function togglePaid(req: Request, res: Response): Promise<void> {
     if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Expense not found'));
     else if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Expense does not belong to this trip'));
     else if (msg === 'PAYER_CANNOT_BE_MARKED') res.status(400).json(fail('PAYER_CANNOT_BE_MARKED', 'Payer is not in the debt list'));
-    else if (msg === 'NOT_IN_SPLIT') res.status(400).json(fail('NOT_IN_SPLIT', 'User is not part of this expense split'));
+    else if (msg === 'NOT_IN_SPLIT') res.status(400).json(fail('NOT_IN_SPLIT', 'You are not part of this expense split'));
     else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
