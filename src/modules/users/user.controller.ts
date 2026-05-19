@@ -2,12 +2,20 @@ import { Router, Request, Response } from 'express';
 import { UserRepository } from './user.repository';
 import { InvitationRepository } from '../invitations/invitation.repository';
 import { TripRepository } from '../trips/trip.repository';
+import {
+  listMyInvitationHistory,
+  hideInvitationHistoryEntry,
+} from '../invitation-history/invitation-history.controller';
 
 const userRepo = new UserRepository();
 const invitationRepo = new InvitationRepository();
 const tripRepo = new TripRepository();
 
 export const userRouter = Router();
+
+// Invitation history (caller-scoped; never accepts inviterId from input).
+userRouter.get('/me/invitation-history', listMyInvitationHistory);
+userRouter.post('/me/invitation-history/:userId/hide', hideInvitationHistoryEntry);
 
 // GET /api/users/me
 userRouter.get('/me', async (req: Request, res: Response) => {

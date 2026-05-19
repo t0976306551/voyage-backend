@@ -14,10 +14,12 @@ import checklistsRouter from '../checklists/checklists.router';
 import { InvitationRepository } from '../invitations/invitation.repository';
 import { UserRepository } from '../users/user.repository';
 import { TripRepository } from './trip.repository';
+import { InvitationHistoryRepository } from '../invitation-history/invitation-history.repository';
 
 const invitationRepo = new InvitationRepository();
 const userRepo = new UserRepository();
 const tripRepo = new TripRepository();
+const invitationHistoryRepo = new InvitationHistoryRepository();
 
 const router = Router();
 
@@ -79,7 +81,93 @@ router.post(
       status: 'pending',
     });
 
+    // Record in invitation history (best-effort; don't fail the request).
+    try {
+      await invitationHistoryRepo.upsert(req.user!.id, invitedUser.id);
+    } catch (e) {
+      console.error('[invitation-history] upsert failed', e);
+    }
+
     res.status(201).json({ ok: true, invitedUser: { id: invitedUser.id, name: invitedUser.name, handle: invitedUser.handle } });
+  }
+);
+
+// POST /api/trips/:tripId/invitations/batch — invite multiple users by id at once
+router.post(
+  '/:tripId/invitations/batch',
+  requireTripRole('Owner', 'Editor'),
+  async (req: Request, res: Response) => {
+    if (req.tripRole === 'Editor' && !req.collaboratorPermissions?.canInvite) {
+      return void res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    const body = req.body as { userIds?: unknown };
+    const userIdsRaw = Array.isArray(body.userIds) ? body.userIds : null;
+    if (!userIdsRaw) {
+      return void res.status(400).json({ error: 'BAD_REQUEST', message: 'userIds must be an array' });
+    }
+    if (userIdsRaw.length === 0) {
+      return void res.status(400).json({ error: 'BAD_REQUEST', message: 'userIds is empty' });
+    }
+    if (userIdsRaw.length > 20) {
+      return void res.status(400).json({ error: 'BAD_REQUEST', message: 'Up to 20 users per batch' });
+    }
+
+    // De-dup + filter non-strings
+    const userIds = Array.from(
+      new Set(
+        userIdsRaw.filter((x): x is string => typeof x === 'string' && x.length > 0),
+      ),
+    );
+
+    const tripId = req.params['tripId'] as string;
+    const trip = await tripRepo.findById(tripId);
+    if (!trip) return void res.status(404).json({ error: 'NOT_FOUND' });
+
+    const invited: { userId: string; name: string | null; handle: string | null }[] = [];
+    const skipped: { userId: string; reason: 'ALREADY_MEMBER' | 'ALREADY_INVITED' | 'NOT_FOUND' }[] = [];
+
+    for (const userId of userIds) {
+      // Self-invite — treat as NOT_FOUND to avoid leaking
+      if (userId === req.user!.id) {
+        skipped.push({ userId, reason: 'NOT_FOUND' });
+        continue;
+      }
+
+      const targetUser = await userRepo.findById(userId);
+      if (!targetUser) {
+        skipped.push({ userId, reason: 'NOT_FOUND' });
+        continue;
+      }
+
+      if (trip.members.some((m: { userId: string }) => m.userId === targetUser.id)) {
+        skipped.push({ userId, reason: 'ALREADY_MEMBER' });
+        continue;
+      }
+
+      const existing = await invitationRepo.findPendingByTripAndUser(tripId, targetUser.id);
+      if (existing) {
+        skipped.push({ userId, reason: 'ALREADY_INVITED' });
+        continue;
+      }
+
+      await invitationRepo.create({
+        tripId,
+        invitedUserId: targetUser.id,
+        invitedByUserId: req.user!.id,
+        status: 'pending',
+      });
+
+      try {
+        await invitationHistoryRepo.upsert(req.user!.id, targetUser.id);
+      } catch (e) {
+        console.error('[invitation-history] upsert failed in batch', e);
+      }
+
+      invited.push({ userId: targetUser.id, name: targetUser.name ?? null, handle: targetUser.handle ?? null });
+    }
+
+    res.json({ invited, skipped });
   }
 );
 

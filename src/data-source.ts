@@ -10,6 +10,7 @@ import { Attachment } from './modules/attachments/attachment.entity';
 import { ChecklistItem } from './modules/checklists/checklist-item.entity';
 import { ChecklistAssignment } from './modules/checklists/checklist-assignment.entity';
 import { TripInvitation } from './modules/invitations/invitation.entity';
+import { InvitationHistory } from './modules/invitation-history/invitation-history.entity';
 
 dotenv.config();
 
@@ -22,6 +23,6 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'voyagestack',
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Trip, Itinerary, Expense, Task, Attachment, ChecklistItem, ChecklistAssignment, TripInvitation],
+  entities: [User, Trip, Itinerary, Expense, Task, Attachment, ChecklistItem, ChecklistAssignment, TripInvitation, InvitationHistory],
   migrations: ['src/migrations/*.ts'],
 });
