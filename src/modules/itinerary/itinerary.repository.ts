@@ -1,4 +1,4 @@
-import { IsNull, Not } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../../data-source';
 import { Itinerary } from './itinerary.entity';
 
@@ -11,10 +11,12 @@ export class ItineraryRepository {
     return this.repo.save(this.repo.create(data));
   }
 
+  /** Returns ALL items for a trip, including bucket (day === null).
+   *  Sort bucket items first, then by day ASC. Frontend filters per view. */
   async findByTrip(tripId: string): Promise<Itinerary[]> {
     return this.repo.find({
-      where: { tripId, day: Not(IsNull()) },
-      order: { day: 'ASC', order: 'ASC' },
+      where: { tripId },
+      order: { day: { direction: 'ASC', nulls: 'FIRST' }, order: 'ASC' },
     });
   }
 
