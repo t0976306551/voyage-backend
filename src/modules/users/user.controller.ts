@@ -66,10 +66,11 @@ userRouter.post('/me/invitations/:id/accept', async (req: Request, res: Response
   if (!inv || inv.invitedUserId !== userId) return void res.status(404).json({ error: 'NOT_FOUND' });
   if (inv.status !== 'pending') return void res.status(409).json({ error: 'ALREADY_RESPONDED' });
 
-  // Add user to trip as Viewer
+  // Add user to trip as Editor (consistent with joinByInviteCode / joinByTripId).
+  // Owner can later downgrade to Viewer via permission settings if needed.
   const trip = await tripRepo.findById(inv.tripId);
   if (trip && !trip.members.some((m: any) => m.userId === userId)) {
-    trip.members = [...trip.members, { userId, role: 'Viewer' }];
+    trip.members = [...trip.members, { userId, role: 'Editor' }];
     await tripRepo.update(inv.tripId, { members: trip.members });
   }
 
