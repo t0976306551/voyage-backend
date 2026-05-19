@@ -3,7 +3,7 @@ import { In } from 'typeorm';
 import { AppDataSource } from '../../data-source';
 import { User } from '../users/user.entity';
 import { Trip, TripMember, CollaboratorPermissions, DEFAULT_COLLABORATOR_PERMISSIONS } from './trip.entity';
-import { TripRepository } from './trip.repository';
+import { TripRepository, ListOpts } from './trip.repository';
 
 function generateInviteCode(): string {
   return randomBytes(6).toString('hex').toUpperCase();
@@ -79,6 +79,26 @@ export class TripService {
   async getMyTrips(userId: string): Promise<HydratedTrip[]> {
     const trips = await this.repo.findByUserId(userId);
     return Promise.all(trips.map((t) => hydrateMembers(t)));
+  }
+
+  async getMyTripsPaginated(
+    userId: string,
+    opts: ListOpts,
+  ): Promise<{
+    items: HydratedTrip[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, Math.floor(opts.page) || 1);
+    const pageSize = Math.min(50, Math.max(1, Math.floor(opts.pageSize) || 10));
+
+    const [trips, total] = await this.repo.findByUserIdPaginated(userId, { ...opts, page, pageSize });
+    const items = await Promise.all(trips.map((t) => hydrateMembers(t)));
+    const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+
+    return { items, total, page, pageSize, totalPages };
   }
 
   async getTripById(tripId: string, userId: string): Promise<HydratedTrip> {

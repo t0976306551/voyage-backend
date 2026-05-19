@@ -7,10 +7,34 @@ import { broadcastToTrip, forceLeaveTrip } from '../../socket/broadcaster';
 
 const service = new TripService(new TripRepository());
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIsoDate(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const s = v.trim();
+  if (!ISO_DATE_RE.test(s)) return undefined;
+  // Validate it's a real calendar date
+  const d = new Date(`${s}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return s;
+}
+
+function parsePositiveInt(v: unknown, def: number, min: number, max: number): number {
+  if (typeof v !== 'string' && typeof v !== 'number') return def;
+  const n = typeof v === 'number' ? v : parseInt(v, 10);
+  if (!Number.isFinite(n) || Number.isNaN(n)) return def;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
 export async function getMyTrips(req: Request, res: Response): Promise<void> {
   try {
-    const trips = await service.getMyTrips(req.user!.id);
-    res.json(ok(trips));
+    const page = parsePositiveInt(req.query['page'], 1, 1, Number.MAX_SAFE_INTEGER);
+    const pageSize = parsePositiveInt(req.query['pageSize'], 10, 1, 50);
+    const from = parseIsoDate(req.query['from']);
+    const to = parseIsoDate(req.query['to']);
+
+    const result = await service.getMyTripsPaginated(req.user!.id, { page, pageSize, from, to });
+    res.json(ok(result));
   } catch {
     res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
