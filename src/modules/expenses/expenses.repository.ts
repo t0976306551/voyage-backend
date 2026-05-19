@@ -29,4 +29,20 @@ export class ExpensesRepository {
   async delete(id: string): Promise<void> {
     await this.repo.delete(id);
   }
+
+  /**
+   * Find expenses in a trip where `userId` owes a positive share to a different payer
+   * and has not yet marked as paid back.
+   * Returns the full Expense rows so callers can hydrate names/amounts.
+   */
+  async findUnsettledByDebtor(tripId: string, userId: string): Promise<Expense[]> {
+    const all = await this.repo.find({ where: { tripId } });
+    return all.filter((e) => {
+      if (e.payerId === userId) return false;
+      const owed = Number(e.splitInfo?.[userId] ?? 0);
+      if (!Number.isFinite(owed) || owed <= 0) return false;
+      const paid = e.paidBack?.[userId];
+      return !paid;
+    });
+  }
 }

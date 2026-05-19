@@ -5,8 +5,18 @@ import { User } from '../users/user.entity';
 import { Trip, TripMember, CollaboratorPermissions, DEFAULT_COLLABORATOR_PERMISSIONS } from './trip.entity';
 import { TripRepository, ListOpts } from './trip.repository';
 import { InvitationHistoryRepository } from '../invitation-history/invitation-history.repository';
+import { ExpensesRepository } from '../expenses/expenses.repository';
+import { TasksRepository } from '../tasks/tasks.repository';
+import { ChecklistsRepository } from '../checklists/checklists.repository';
+import { Task } from '../tasks/task.entity';
+import { ChecklistAssignment } from '../checklists/checklist-assignment.entity';
+import { ChecklistItem } from '../checklists/checklist-item.entity';
+import { Expense } from '../expenses/expense.entity';
 
 const invitationHistoryRepo = new InvitationHistoryRepository();
+const expensesRepo = new ExpensesRepository();
+const tasksRepo = new TasksRepository();
+const checklistsRepo = new ChecklistsRepository();
 
 /** Best-effort upsert — never throw to the caller (write to Owner's history). */
 async function trackOwnerHistory(trip: { members: TripMember[] }, joinedUserId: string): Promise<void> {
@@ -40,6 +50,30 @@ export interface TripPreview {
   endDate?: string;
   ownerName: string;
   memberCount: number;
+}
+
+export interface UnsettledDebt {
+  expenseId: string;
+  description: string | null;
+  amount: number;
+  currency: string;
+  payerName: string;
+}
+
+export interface LeavePreview {
+  targetUserId: string;
+  targetName: string;
+  isSelf: boolean;
+  canRemove: boolean;
+  blockReason?: 'UNSETTLED_DEBTS';
+  unsettledDebts: UnsettledDebt[];
+  assignedTasks: Array<{ id: string; title: string }>;
+  assignedChecklists: Array<{ id: string; title: string }>;
+  createdContent: {
+    itineraryItems: number;
+    checklists: number;
+    expensesPaidByThem: number;
+  };
 }
 
 async function hydrateMembers(trip: Trip): Promise<HydratedTrip> {
@@ -171,28 +205,133 @@ export class TripService {
   }
 
   async removeMember(tripId: string, targetUserId: string): Promise<HydratedTrip> {
+    await this._removeMemberWithCleanup(tripId, targetUserId, false);
+    const reloaded = await this.repo.findById(tripId);
+    if (!reloaded) throw new Error('NOT_FOUND');
+    return hydrateMembers(reloaded);
+  }
+
+  async leaveTrip(tripId: string, userId: string): Promise<void> {
+    await this._removeMemberWithCleanup(tripId, userId, true);
+  }
+
+  /**
+   * Compute the impact of removing a member from a trip (self-leave or kick).
+   * Caller-permission validation is done by the controller/middleware.
+   */
+  async getLeavePreview(tripId: string, targetUserId: string, callerUserId: string): Promise<LeavePreview> {
     const trip = await this.repo.findById(tripId);
     if (!trip) throw new Error('NOT_FOUND');
 
     const target = trip.members.find((m) => m.userId === targetUserId);
     if (!target) throw new Error('NOT_MEMBER');
-    if (target.role === 'Owner') throw new Error('CANNOT_KICK_OWNER');
+    if (target.role === 'Owner') {
+      throw new Error(targetUserId === callerUserId ? 'CANNOT_LEAVE_AS_OWNER' : 'CANNOT_KICK_OWNER');
+    }
 
-    const updatedMembers = trip.members.filter((m) => m.userId !== targetUserId);
-    const updated = await this.repo.update(tripId, { members: updatedMembers });
-    return hydrateMembers(updated);
+    // Hydrate user names for target + payers
+    const debts = await expensesRepo.findUnsettledByDebtor(tripId, targetUserId);
+    const payerIds = Array.from(new Set(debts.map((d) => d.payerId)));
+    const userIdsToLoad = Array.from(new Set([targetUserId, ...payerIds]));
+    const users = await AppDataSource.getRepository(User).find({
+      where: { id: In(userIdsToLoad) },
+      select: ['id', 'name', 'email'],
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const targetUser = userMap.get(targetUserId);
+    const targetName = targetUser?.name || targetUser?.email?.split('@')[0] || 'Unknown';
+
+    const unsettledDebts: UnsettledDebt[] = debts.map((e) => {
+      const payer = userMap.get(e.payerId);
+      const payerName = payer?.name || payer?.email?.split('@')[0] || 'Unknown';
+      const owed = Number(e.splitInfo?.[targetUserId] ?? 0);
+      return {
+        expenseId: e.id,
+        description: e.description ?? null,
+        amount: owed,
+        currency: e.currency,
+        payerName,
+      };
+    });
+
+    const assignedTasksRaw = await tasksRepo.findAssignedToUser(tripId, targetUserId);
+    const assignedTasks = assignedTasksRaw.map((t) => ({ id: t.id, title: t.title }));
+
+    const assignedChecklists = await checklistsRepo.findAssignmentsForUser(tripId, targetUserId);
+
+    // createdContent counts
+    const itineraryItems = 0; // itinerary entity does not track creator
+    const checklistsCount = await AppDataSource.getRepository(ChecklistItem).count({
+      where: { tripId, createdById: targetUserId },
+    });
+    const expensesPaidByThem = await AppDataSource.getRepository(Expense).count({
+      where: { tripId, payerId: targetUserId },
+    });
+
+    const canRemove = unsettledDebts.length === 0;
+    const result: LeavePreview = {
+      targetUserId,
+      targetName,
+      isSelf: targetUserId === callerUserId,
+      canRemove,
+      unsettledDebts,
+      assignedTasks,
+      assignedChecklists,
+      createdContent: {
+        itineraryItems,
+        checklists: checklistsCount,
+        expensesPaidByThem,
+      },
+    };
+    if (!canRemove) result.blockReason = 'UNSETTLED_DEBTS';
+    return result;
   }
 
-  async leaveTrip(tripId: string, userId: string): Promise<void> {
+  private async _removeMemberWithCleanup(
+    tripId: string,
+    targetUserId: string,
+    isSelf: boolean,
+  ): Promise<void> {
     const trip = await this.repo.findById(tripId);
     if (!trip) throw new Error('NOT_FOUND');
 
-    const member = trip.members.find((m) => m.userId === userId);
-    if (!member) throw new Error('NOT_MEMBER');
-    if (member.role === 'Owner') throw new Error('CANNOT_LEAVE_AS_OWNER');
+    const target = trip.members.find((m) => m.userId === targetUserId);
+    if (!target) throw new Error('NOT_MEMBER');
+    if (target.role === 'Owner') {
+      throw new Error(isSelf ? 'CANNOT_LEAVE_AS_OWNER' : 'CANNOT_KICK_OWNER');
+    }
 
-    const updatedMembers = trip.members.filter((m) => m.userId !== userId);
-    await this.repo.update(tripId, { members: updatedMembers });
+    const debts = await expensesRepo.findUnsettledByDebtor(tripId, targetUserId);
+    if (debts.length > 0) throw new Error('UNSETTLED_DEBTS');
+
+    const nextMembers = trip.members.filter((m) => m.userId !== targetUserId);
+
+    await AppDataSource.transaction(async (manager) => {
+      // 1. Unassign tasks
+      await manager
+        .createQueryBuilder()
+        .update(Task)
+        .set({ assignedUserId: null as unknown as string })
+        .where('trip_id = :tripId AND assigned_user_id = :userId', {
+          tripId,
+          userId: targetUserId,
+        })
+        .execute();
+
+      // 2. Delete checklist assignments for items belonging to this trip
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(ChecklistAssignment)
+        .where(
+          'user_id = :userId AND item_id IN (SELECT id FROM checklist_items WHERE trip_id = :tripId)',
+          { userId: targetUserId, tripId },
+        )
+        .execute();
+
+      // 3. Remove from trip.members (jsonb)
+      await manager.update(Trip, tripId, { members: nextMembers });
+    });
   }
 
   async getTripPreviewByCode(code: string): Promise<TripPreview> {

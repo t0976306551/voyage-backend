@@ -80,4 +80,27 @@ export class ChecklistsRepository {
     existing.completedAt = completed ? new Date() : null;
     return this.assignRepo.save(existing);
   }
+
+  /**
+   * Find checklist items in a trip that the given user is assigned to.
+   * Joins checklist_items + checklist_assignments.
+   */
+  async findAssignmentsForUser(
+    tripId: string,
+    userId: string,
+  ): Promise<Array<{ id: string; title: string }>> {
+    const rows = await this.itemRepo
+      .createQueryBuilder('item')
+      .innerJoin(
+        ChecklistAssignment,
+        'a',
+        'a.item_id = item.id AND a.user_id = :userId',
+        { userId },
+      )
+      .where('item.trip_id = :tripId', { tripId })
+      .orderBy('item.created_at', 'ASC')
+      .select(['item.id AS id', 'item.title AS title'])
+      .getRawMany<{ id: string; title: string }>();
+    return rows;
+  }
 }

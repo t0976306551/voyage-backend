@@ -159,6 +159,39 @@ export async function removeMember(req: Request, res: Response): Promise<void> {
     if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
     else if (msg === 'NOT_MEMBER') res.status(404).json(fail('NOT_MEMBER', 'User is not a member'));
     else if (msg === 'CANNOT_KICK_OWNER') res.status(400).json(fail('CANNOT_KICK_OWNER', 'Cannot remove the trip owner'));
+    else if (msg === 'UNSETTLED_DEBTS') res.status(400).json(fail('UNSETTLED_DEBTS', 'Cannot remove member with unsettled debts'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  }
+}
+
+export async function getLeavePreview(req: Request, res: Response): Promise<void> {
+  try {
+    const tripId = req.params['tripId'] as string;
+    const callerId = req.user!.id;
+    const queryUserId = typeof req.query['userId'] === 'string' ? req.query['userId'].trim() : '';
+    const targetUserId = queryUserId && queryUserId !== callerId ? queryUserId : callerId;
+    const isSelf = targetUserId === callerId;
+
+    // Permission gate: requireTripRole already verified caller is a member.
+    // For kick-preview (target != self), caller must be Owner.
+    if (!isSelf && req.tripRole !== 'Owner') {
+      res.status(403).json(fail('FORBIDDEN', 'Only the trip owner can preview kicking another member'));
+      return;
+    }
+    // For self-preview, caller must not be Owner (Owner cannot leave).
+    if (isSelf && req.tripRole === 'Owner') {
+      res.status(400).json(fail('CANNOT_LEAVE_AS_OWNER', 'Owner cannot leave the trip'));
+      return;
+    }
+
+    const preview = await service.getLeavePreview(tripId, targetUserId, callerId);
+    res.json(ok(preview));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
+    else if (msg === 'NOT_MEMBER') res.status(404).json(fail('NOT_MEMBER', 'Target user is not a member'));
+    else if (msg === 'CANNOT_KICK_OWNER') res.status(400).json(fail('CANNOT_KICK_OWNER', 'Cannot remove the trip owner'));
+    else if (msg === 'CANNOT_LEAVE_AS_OWNER') res.status(400).json(fail('CANNOT_LEAVE_AS_OWNER', 'Owner cannot leave the trip'));
     else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
@@ -212,6 +245,7 @@ export async function leaveTrip(req: Request, res: Response): Promise<void> {
     if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
     else if (msg === 'NOT_MEMBER') res.status(400).json(fail('NOT_MEMBER', 'Not a member'));
     else if (msg === 'CANNOT_LEAVE_AS_OWNER') res.status(400).json(fail('CANNOT_LEAVE_AS_OWNER', 'Owner cannot leave the trip'));
+    else if (msg === 'UNSETTLED_DEBTS') res.status(400).json(fail('UNSETTLED_DEBTS', 'Cannot leave with unsettled debts'));
     else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }

@@ -33,4 +33,13 @@ export class TasksRepository {
   async delete(id: string): Promise<void> {
     await this.repo.delete(id);
   }
+
+  async findAssignedToUser(tripId: string, userId: string): Promise<Task[]> {
+    return this.repo
+      .createQueryBuilder('task')
+      .where('task.trip_id = :tripId', { tripId })
+      .andWhere('task.assigned_user_id = :userId', { userId })
+      .orderBy('task.created_at', 'ASC')
+      .getMany();
+  }
 }
