@@ -56,13 +56,22 @@ export class ExpensesService {
     return this.repo.delete(id);
   }
 
-  /** Mark a non-payer's share as paid back (or undo). Payer never gets tracked here. */
-  async togglePaid(id: string, tripId: string, userId: string, paid: boolean): Promise<Expense> {
+  /**
+   * Mark a non-payer's share as paid back (or undo). Payer never gets tracked here.
+   * Caller must be either the target user themselves OR the payer (acting on their behalf).
+   */
+  async togglePaid(
+    id: string, tripId: string, userId: string, paid: boolean, callerId: string,
+  ): Promise<Expense> {
     const existing = await this.repo.findById(id);
     if (!existing) throw new Error('NOT_FOUND');
     if (existing.tripId !== tripId) throw new Error('FORBIDDEN');
     if (userId === existing.payerId) throw new Error('PAYER_CANNOT_BE_MARKED');
     if (!(userId in (existing.splitInfo ?? {}))) throw new Error('NOT_IN_SPLIT');
+    // Permission: caller must be the target user OR the payer
+    if (callerId !== userId && callerId !== existing.payerId) {
+      throw new Error('CALLER_NOT_ALLOWED');
+    }
     const next: Record<string, string> = { ...(existing.paidBack ?? {}) };
     if (paid) {
       next[userId] = new Date().toISOString();
