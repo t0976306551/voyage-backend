@@ -4,6 +4,20 @@ import { AppDataSource } from '../../data-source';
 import { User } from '../users/user.entity';
 import { Trip, TripMember, CollaboratorPermissions, DEFAULT_COLLABORATOR_PERMISSIONS } from './trip.entity';
 import { TripRepository, ListOpts } from './trip.repository';
+import { InvitationHistoryRepository } from '../invitation-history/invitation-history.repository';
+
+const invitationHistoryRepo = new InvitationHistoryRepository();
+
+/** Best-effort upsert — never throw to the caller (write to Owner's history). */
+async function trackOwnerHistory(trip: { members: TripMember[] }, joinedUserId: string): Promise<void> {
+  const owner = trip.members.find((m) => m.role === 'Owner');
+  if (!owner || owner.userId === joinedUserId) return;
+  try {
+    await invitationHistoryRepo.upsert(owner.userId, joinedUserId);
+  } catch (e) {
+    console.error('[trip.service] track owner history failed', e instanceof Error ? e.message : e);
+  }
+}
 
 function generateInviteCode(): string {
   return randomBytes(6).toString('hex').toUpperCase();
@@ -151,7 +165,9 @@ export class TripService {
     if (alreadyMember) return trip;
 
     const updatedMembers = [...trip.members, { userId, role: 'Editor' as const }];
-    return this.repo.update(trip.id, { members: updatedMembers });
+    const updated = await this.repo.update(trip.id, { members: updatedMembers });
+    await trackOwnerHistory(updated, userId);
+    return updated;
   }
 
   async removeMember(tripId: string, targetUserId: string): Promise<HydratedTrip> {
@@ -200,6 +216,7 @@ export class TripService {
 
     const updatedMembers = [...trip.members, { userId, role: 'Editor' as const }];
     const updated = await this.repo.update(tripId, { members: updatedMembers });
+    await trackOwnerHistory(updated, userId);
     return hydrateMembers(updated);
   }
 
