@@ -11,6 +11,7 @@ import itineraryRouter from '../itinerary/itinerary.router';
 import expensesRouter from '../expenses/expenses.router';
 import tasksRouter from '../tasks/tasks.router';
 import checklistsRouter from '../checklists/checklists.router';
+import { personalRouter } from '../personal/personal.controller';
 import { InvitationRepository } from '../invitations/invitation.repository';
 import { UserRepository } from '../users/user.repository';
 import { TripRepository } from './trip.repository';
@@ -50,6 +51,7 @@ router.use('/:tripId/itinerary', itineraryRouter);
 router.use('/:tripId/expenses', expensesRouter);
 router.use('/:tripId/tasks', tasksRouter);
 router.use('/:tripId/checklists', checklistsRouter);
+router.use('/:tripId/personal', requireTripRole('Owner', 'Editor', 'Viewer'), personalRouter);
 
 // POST /api/trips/:tripId/invitations — Owner invites user by handle
 router.post(

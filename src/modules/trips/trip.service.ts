@@ -12,11 +12,16 @@ import { Task } from '../tasks/task.entity';
 import { ChecklistAssignment } from '../checklists/checklist-assignment.entity';
 import { ChecklistItem } from '../checklists/checklist-item.entity';
 import { Expense } from '../expenses/expense.entity';
+import { PersonalRepository } from '../personal/personal.repository';
+import { PersonalMemo } from '../personal/personal-memo.entity';
+import { PersonalMemoItem } from '../personal/personal-memo-item.entity';
+import { PersonalExpense } from '../personal/personal-expense.entity';
 
 const invitationHistoryRepo = new InvitationHistoryRepository();
 const expensesRepo = new ExpensesRepository();
 const tasksRepo = new TasksRepository();
 const checklistsRepo = new ChecklistsRepository();
+const personalRepo = new PersonalRepository();
 
 /** Best-effort upsert — never throw to the caller (write to Owner's history). */
 async function trackOwnerHistory(trip: { members: TripMember[] }, joinedUserId: string): Promise<void> {
@@ -73,6 +78,10 @@ export interface LeavePreview {
     itineraryItems: number;
     checklists: number;
     expensesPaidByThem: number;
+  };
+  personalData: {
+    memos: number;
+    expenses: number;
   };
 }
 
@@ -268,6 +277,12 @@ export class TripService {
       where: { tripId, payerId: targetUserId },
     });
 
+    const personalCounts = await personalRepo.countMemosByUser(tripId, targetUserId)
+      .then(async (memos) => ({
+        memos,
+        expenses: await personalRepo.countExpensesByUser(tripId, targetUserId),
+      }));
+
     const canRemove = unsettledDebts.length === 0;
     const result: LeavePreview = {
       targetUserId,
@@ -282,6 +297,7 @@ export class TripService {
         checklists: checklistsCount,
         expensesPaidByThem,
       },
+      personalData: personalCounts,
     };
     if (!canRemove) result.blockReason = 'UNSETTLED_DEBTS';
     return result;
@@ -329,7 +345,16 @@ export class TripService {
         )
         .execute();
 
-      // 3. Remove from trip.members (jsonb)
+      // 3. Delete all personal memos (+ items via repo) and expenses for this user in this trip
+      const memos = await manager.find(PersonalMemo, { where: { tripId, userId: targetUserId } });
+      if (memos.length > 0) {
+        const memoIds = memos.map((m) => m.id);
+        await manager.delete(PersonalMemoItem, { memoId: In(memoIds) });
+        await manager.delete(PersonalMemo, { tripId, userId: targetUserId });
+      }
+      await manager.delete(PersonalExpense, { tripId, userId: targetUserId });
+
+      // 4. Remove from trip.members (jsonb)
       await manager.update(Trip, tripId, { members: nextMembers });
     });
   }
