@@ -99,7 +99,7 @@ userRouter.get('/me/invitations', async (req: Request, res: Response) => {
 // POST /api/users/me/invitations/:id/accept
 userRouter.post('/me/invitations/:id/accept', async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const inv = await invitationRepo.findById(req.params['id']!);
+  const inv = await invitationRepo.findById(req.params['id'] as string);
   if (!inv || inv.invitedUserId !== userId) return void res.status(404).json({ error: 'NOT_FOUND' });
   if (inv.status !== 'pending') return void res.status(409).json({ error: 'ALREADY_RESPONDED' });
 
@@ -118,7 +118,7 @@ userRouter.post('/me/invitations/:id/accept', async (req: Request, res: Response
 // POST /api/users/me/invitations/:id/decline
 userRouter.post('/me/invitations/:id/decline', async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const inv = await invitationRepo.findById(req.params['id']!);
+  const inv = await invitationRepo.findById(req.params['id'] as string);
   if (!inv || inv.invitedUserId !== userId) return void res.status(404).json({ error: 'NOT_FOUND' });
   if (inv.status !== 'pending') return void res.status(409).json({ error: 'ALREADY_RESPONDED' });
   await invitationRepo.update(inv.id, { status: 'declined' });

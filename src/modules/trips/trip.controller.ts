@@ -4,6 +4,7 @@ import { TripRepository } from './trip.repository';
 import { CollaboratorPermissions } from './trip.entity';
 import { ok, fail } from '../../shared/types/response.types';
 import { broadcastToTrip, forceLeaveTrip } from '../../socket/broadcaster';
+import { generateDeleteToken, verifyDeleteToken } from './delete-token.util';
 
 const service = new TripService(new TripRepository());
 
@@ -250,9 +251,28 @@ export async function leaveTrip(req: Request, res: Response): Promise<void> {
   }
 }
 
+export function getDeleteToken(req: Request, res: Response): void {
+  const tripId = req.params['tripId'] as string;
+  res.json(ok(generateDeleteToken(tripId)));
+}
+
 export async function deleteTrip(req: Request, res: Response): Promise<void> {
   try {
     const tripId = req.params['tripId'] as string;
+    const body = req.body as { code?: unknown; token?: unknown };
+    const code = typeof body.code === 'string' ? body.code : '';
+    const token = typeof body.token === 'string' ? body.token : '';
+
+    if (!code || !token) {
+      res.status(400).json(fail('BAD_REQUEST', 'code and token are required'));
+      return;
+    }
+
+    if (!verifyDeleteToken(tripId, code, token)) {
+      res.status(400).json(fail('INVALID_DELETE_TOKEN', 'Invalid or expired delete token'));
+      return;
+    }
+
     const memberIds = await service.deleteTrip(tripId);
     broadcastToTrip(tripId, 'trip:deleted', { tripId });
     for (const userId of memberIds) {

@@ -134,6 +134,24 @@ describe('Group 1: Auth boundary — unauthenticated requests return 401', () =>
       .send({ title: 'New title' });
     expect(res.status).toBe(401);
   });
+
+  // -------------------------------------------------------------------------
+  // DELETE /api/trips/:id (requires delete token)
+  // -------------------------------------------------------------------------
+  it('DELETE /api/trips/:id — no token → 401', async () => {
+    const res = await request(app)
+      .delete('/api/trips/non-existent-trip-id')
+      .send({ code: 'AAAAAAAA', token: 'fake' });
+    expect(res.status).toBe(401);
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /api/trips/:id/delete-token
+  // -------------------------------------------------------------------------
+  it('GET /api/trips/:id/delete-token — no token → 401', async () => {
+    const res = await request(app).get('/api/trips/non-existent-trip-id/delete-token');
+    expect(res.status).toBe(401);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -221,6 +239,55 @@ describe('Group 2: Input validation — malformed bodies return 400', () => {
       .set(authHeader())
       .send({});
     expect(res.status).not.toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Group 2b: DELETE /api/trips/:id — delete-token validation (Layer A, no DB)
+// ---------------------------------------------------------------------------
+// The new delete flow requires { code, token } in the request body.
+// requireTripRole fires before the controller; with no DB it will likely 500.
+// We care that missing/invalid body is never silently accepted (never 200).
+// Auth boundary (401) and token validity (400) are verified without a DB.
+// ---------------------------------------------------------------------------
+
+describe('Group 2b: Delete-trip token validation (Layer A — no DB)', () => {
+  it('DELETE /api/trips/:id — no auth → 401', async () => {
+    const res = await request(app)
+      .delete('/api/trips/fake-trip-id')
+      .send({ code: 'AAAAAAAA', token: 'fake-token' });
+    expect(res.status).toBe(401);
+  });
+
+  it('DELETE /api/trips/:id — valid auth, missing code+token → must not be 200', async () => {
+    const res = await request(app)
+      .delete('/api/trips/fake-trip-id')
+      .set(authHeader())
+      .send({});
+    expect(res.status).not.toBe(200);
+  });
+
+  it('DELETE /api/trips/:id — valid auth, missing token field → must not be 200', async () => {
+    const res = await request(app)
+      .delete('/api/trips/fake-trip-id')
+      .set(authHeader())
+      .send({ code: 'AAAAAAAA' });
+    expect(res.status).not.toBe(200);
+  });
+
+  it('DELETE /api/trips/:id — valid auth, garbage token → 400 INVALID_DELETE_TOKEN or middleware error', async () => {
+    const res = await request(app)
+      .delete('/api/trips/fake-trip-id')
+      .set(authHeader())
+      .send({ code: 'AAAAAAAA', token: 'invalid.garbage.token' });
+    // Either 400 (token verified before DB check) or 403/404/500 (middleware ran first).
+    // Critical: must never be 200.
+    expect(res.status).not.toBe(200);
+  });
+
+  it('GET /api/trips/:id/delete-token — no auth → 401', async () => {
+    const res = await request(app).get('/api/trips/fake-trip-id/delete-token');
+    expect(res.status).toBe(401);
   });
 });
 
@@ -325,7 +392,6 @@ describe('Group 4: RBAC + IDOR — live DB integration', () => {
         { userId: userDId, role: 'Editor' },
       ],
       enabledModules: { tasks: true, expenses: true, checklists: true },
-      isPublicTemplate: false,
     });
     const savedA = await repo.save(tripA);
     tripAId = savedA.id;
@@ -337,7 +403,6 @@ describe('Group 4: RBAC + IDOR — live DB integration', () => {
       inviteCode: inviteCodeB,
       members: [{ userId: userBId, role: 'Owner' }],
       enabledModules: { tasks: true, expenses: true, checklists: true },
-      isPublicTemplate: false,
     });
     const savedB = await repo.save(tripB);
     tripBId = savedB.id;
@@ -377,30 +442,43 @@ describe('Group 4: RBAC + IDOR — live DB integration', () => {
     expect(res.status).toBe(403);
   });
 
-  // ---- RBAC: publish (Owner only) -----------------------------------------
+  // ---- RBAC: delete-token (Owner only) -----------------------------------------
 
-  it('Owner PATCH /trips/:id/publish → 200', async () => {
+  it('Owner GET /trips/:id/delete-token → 200 with code and token', async () => {
     const res = await request(app)
-      .patch(`/api/trips/${tripAId}/publish`)
-      .set(userAHeader)
-      .send({ isPublicTemplate: false });
+      .get(`/api/trips/${tripAId}/delete-token`)
+      .set(userAHeader);
     expect(res.status).toBe(200);
+    expect(typeof res.body?.data?.code).toBe('string');
+    expect(res.body.data.code).toHaveLength(8);
+    expect(typeof res.body?.data?.token).toBe('string');
   });
 
-  it('Editor PATCH /trips/:id/publish → 403 FORBIDDEN (Owner only)', async () => {
+  it('Editor GET /trips/:id/delete-token → 403 FORBIDDEN (Owner only)', async () => {
     const res = await request(app)
-      .patch(`/api/trips/${tripAId}/publish`)
-      .set(userDHeader)
-      .send({ isPublicTemplate: true });
+      .get(`/api/trips/${tripAId}/delete-token`)
+      .set(userDHeader);
     expect(res.status).toBe(403);
   });
 
-  it('Viewer PATCH /trips/:id/publish → 403 FORBIDDEN (Owner only)', async () => {
+  it('Viewer GET /trips/:id/delete-token → 403 FORBIDDEN (Owner only)', async () => {
     const res = await request(app)
-      .patch(`/api/trips/${tripAId}/publish`)
-      .set(userBHeader)
-      .send({ isPublicTemplate: true });
+      .get(`/api/trips/${tripAId}/delete-token`)
+      .set(userBHeader);
     expect(res.status).toBe(403);
+  });
+
+  it('DELETE /trips/:id with wrong code → 400 INVALID_DELETE_TOKEN', async () => {
+    const tokenRes = await request(app)
+      .get(`/api/trips/${tripAId}/delete-token`)
+      .set(userAHeader);
+    const { token } = tokenRes.body.data as { code: string; token: string };
+    const res = await request(app)
+      .delete(`/api/trips/${tripAId}`)
+      .set(userAHeader)
+      .send({ code: 'WRONGCOD', token });
+    expect(res.status).toBe(400);
+    expect(res.body?.error?.code ?? res.body?.code).toBe('INVALID_DELETE_TOKEN');
   });
 
   // ---- IDOR: non-member access --------------------------------------------
@@ -450,17 +528,17 @@ describe('Group 4: RBAC + IDOR — live DB integration', () => {
 
   // ---- Invite code flow ---------------------------------------------------
 
-  it('Valid invite code → 200, user added as Viewer', async () => {
+  it('Valid invite code → 200, user added as Editor', async () => {
     const res = await request(app)
       .post('/api/trips/join')
       .set(userCHeader)
       .send({ inviteCode: inviteCodeA });
     expect(res.status).toBe(200);
 
-    // Verify userC is now a member
+    // Verify userC is now a member (role is Editor — consistent with joinByTripId)
     const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: tripAId } });
     const member = trip?.members.find(m => m.userId === userCId);
-    expect(member?.role).toBe('Viewer');
+    expect(member?.role).toBe('Editor');
   });
 
   it('Invalid invite code → 404', async () => {

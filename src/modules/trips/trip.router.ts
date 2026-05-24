@@ -4,7 +4,7 @@ import { requireTripRole } from '../../shared/middleware/permission.middleware';
 import {
   getMyTrips, getTripById, createTrip, updateTrip, joinByInviteCode, patchModules,
   removeMember, getTripPreviewByCode, getTripPreviewById, joinByTripId, leaveTrip,
-  patchCollaboratorPermissions, getLeavePreview, deleteTrip,
+  patchCollaboratorPermissions, getLeavePreview, getDeleteToken, deleteTrip,
 } from './trip.controller';
 import { coverUploadMiddleware, coverUploadErrorHandler, uploadTripCover } from './trip-cover.controller';
 import itineraryRouter from '../itinerary/itinerary.router';
@@ -37,6 +37,7 @@ router.patch('/:tripId', requireTripRole('Owner', 'Editor'), updateTrip);
 router.patch('/:tripId/modules', requireTripRole('Owner', 'Editor'), patchModules);
 router.patch('/:tripId/collaborator-permissions', requireTripRole('Owner'), patchCollaboratorPermissions);
 router.get('/:tripId/leave-preview', requireTripRole('Owner', 'Editor', 'Viewer'), getLeavePreview);
+router.get('/:tripId/delete-token', requireTripRole('Owner'), getDeleteToken);
 router.delete('/:tripId', requireTripRole('Owner'), deleteTrip);
 router.delete('/:tripId/members/me', requireTripRole('Owner', 'Editor', 'Viewer'), leaveTrip);
 router.delete('/:tripId/members/:userId', requireTripRole('Owner'), removeMember);
@@ -68,18 +69,19 @@ router.post(
     const invitedUser = await userRepo.findByHandle(handle);
     if (!invitedUser) return void res.status(404).json({ error: 'USER_NOT_FOUND' });
 
-    const trip = await tripRepo.findById(req.params['tripId']!);
+    const tripId = req.params['tripId'] as string;
+    const trip = await tripRepo.findById(tripId);
     if (!trip) return void res.status(404).json({ error: 'NOT_FOUND' });
 
     if (trip.members.some((m: any) => m.userId === invitedUser.id)) {
       return void res.status(409).json({ error: 'ALREADY_MEMBER' });
     }
 
-    const existing = await invitationRepo.findPendingByTripAndUser(req.params['tripId']!, invitedUser.id);
+    const existing = await invitationRepo.findPendingByTripAndUser(tripId, invitedUser.id);
     if (existing) return void res.status(409).json({ error: 'ALREADY_INVITED' });
 
     await invitationRepo.create({
-      tripId: req.params['tripId']!,
+      tripId,
       invitedUserId: invitedUser.id,
       invitedByUserId: req.user!.id,
       status: 'pending',
@@ -180,7 +182,7 @@ router.get(
   '/:tripId/invitations',
   requireTripRole('Owner', 'Editor'),
   async (req: Request, res: Response) => {
-    const invitations = await invitationRepo.findPendingForTrip(req.params['tripId']!);
+    const invitations = await invitationRepo.findPendingForTrip(req.params['tripId'] as string);
     const hydrated = await Promise.all(invitations.map(async (inv) => {
       const user = await userRepo.findById(inv.invitedUserId);
       return {
@@ -200,7 +202,7 @@ router.delete(
   '/:tripId/invitations/:userId',
   requireTripRole('Owner'),
   async (req: Request, res: Response) => {
-    await invitationRepo.cancelByTripAndUser(req.params['tripId']!, req.params['userId']!);
+    await invitationRepo.cancelByTripAndUser(req.params['tripId'] as string, req.params['userId'] as string);
     res.json({ ok: true });
   }
 );

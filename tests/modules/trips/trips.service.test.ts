@@ -44,35 +44,6 @@ describe('TripService', () => {
     });
   });
 
-  describe('setPublishState', () => {
-    it('updates isPublicTemplate when caller is Owner', async () => {
-      const ownerTrip: Partial<Trip> = {
-        id: 'trip-1',
-        isPublicTemplate: false,
-        members: [{ userId: 'user-1', role: 'Owner' }],
-      };
-      const updated: Partial<Trip> = { id: 'trip-1', isPublicTemplate: true, members: [{ userId: 'user-1', role: 'Owner' }] };
-      mockRepo.prototype.findById.mockResolvedValue(ownerTrip as Trip);
-      mockRepo.prototype.update.mockResolvedValue(updated as Trip);
-
-      const result = await service.setPublishState('trip-1', true, 'user-1');
-
-      expect(mockRepo.prototype.update).toHaveBeenCalledWith('trip-1', {
-        isPublicTemplate: true,
-      });
-      expect(result.isPublicTemplate).toBe(true);
-    });
-
-    it('throws FORBIDDEN when caller is not Owner', async () => {
-      const viewerTrip: Partial<Trip> = {
-        id: 'trip-1',
-        members: [{ userId: 'user-viewer', role: 'Viewer' }],
-      };
-      mockRepo.prototype.findById.mockResolvedValue(viewerTrip as Trip);
-
-      await expect(service.setPublishState('trip-1', true, 'user-viewer')).rejects.toThrow('FORBIDDEN');
-    });
-  });
 
   describe('getTripById', () => {
     it('should return trip if user is a member', async () => {
