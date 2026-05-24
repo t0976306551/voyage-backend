@@ -16,6 +16,8 @@ import { PersonalRepository } from '../personal/personal.repository';
 import { PersonalMemo } from '../personal/personal-memo.entity';
 import { PersonalMemoItem } from '../personal/personal-memo-item.entity';
 import { PersonalExpense } from '../personal/personal-expense.entity';
+import { Itinerary } from '../itinerary/itinerary.entity';
+import { TripInvitation } from '../invitations/invitation.entity';
 
 const invitationHistoryRepo = new InvitationHistoryRepository();
 const expensesRepo = new ExpensesRepository();
@@ -403,5 +405,56 @@ export class TripService {
       ownerName,
       memberCount: trip.members.length,
     };
+  }
+
+  async deleteTrip(tripId: string): Promise<string[]> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+    const memberIds = trip.members.map((m) => m.userId);
+
+    await AppDataSource.transaction(async (manager) => {
+      // 1. 清單分配記錄（FK: item_id → checklist_items.id，必須先刪）
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(ChecklistAssignment)
+        .where(
+          'item_id IN (SELECT id FROM checklist_items WHERE trip_id = :tripId)',
+          { tripId },
+        )
+        .execute();
+
+      // 2. 清單項目
+      await manager.delete(ChecklistItem, { tripId });
+
+      // 3. 費用（splitInfo 是 jsonb，無獨立子表）
+      await manager.delete(Expense, { tripId });
+
+      // 4. 待辦
+      await manager.delete(Task, { tripId });
+
+      // 5. 行程景點
+      await manager.delete(Itinerary, { tripId });
+
+      // 6. 個人費用
+      await manager.delete(PersonalExpense, { tripId });
+
+      // 7. 個人備忘 items（FK: memo_id → personal_memos.id，必須先刪）
+      const memos = await manager.find(PersonalMemo, { where: { tripId } });
+      if (memos.length > 0) {
+        await manager.delete(PersonalMemoItem, { memoId: In(memos.map((m) => m.id)) });
+      }
+
+      // 8. 個人備忘
+      await manager.delete(PersonalMemo, { tripId });
+
+      // 9. 邀請記錄
+      await manager.delete(TripInvitation, { tripId });
+
+      // 10. 行程本體
+      await manager.delete(Trip, { id: tripId });
+    });
+
+    return memberIds;
   }
 }

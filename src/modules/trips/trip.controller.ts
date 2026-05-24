@@ -250,6 +250,22 @@ export async function leaveTrip(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function deleteTrip(req: Request, res: Response): Promise<void> {
+  try {
+    const tripId = req.params['tripId'] as string;
+    const memberIds = await service.deleteTrip(tripId);
+    broadcastToTrip(tripId, 'trip:deleted', { tripId });
+    for (const userId of memberIds) {
+      forceLeaveTrip(userId, tripId);
+    }
+    res.json(ok({ ok: true }));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  }
+}
+
 export async function joinByInviteCode(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body as { inviteCode?: string };
