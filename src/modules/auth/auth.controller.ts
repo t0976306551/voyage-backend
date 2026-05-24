@@ -1,9 +1,21 @@
 import { Request, Response } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { AuthService } from './auth.service';
 import { UserRepository } from '../users/user.repository';
 import { ok, fail } from '../../shared/types/response.types';
 
 const service = new AuthService(new UserRepository());
+
+/**
+ * Timing-safe 字串比對，防止 timing attack 爆破 INTERNAL_API_SECRET。
+ * 長度不同時直接 return false，不呼叫 timingSafeEqual（要求等長 buffer）。
+ */
+function safeCompareToken(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 const ERROR_STATUS: Record<string, number> = {
   EMAIL_TAKEN: 409,
@@ -57,5 +69,46 @@ export async function login(req: Request, res: Response): Promise<void> {
   } catch (e: unknown) {
     const code = e instanceof Error ? e.message : 'INTERNAL';
     res.status(ERROR_STATUS[code] ?? 500).json(fail(code, ERROR_MSG[code] ?? '伺服器錯誤'));
+  }
+}
+
+export async function googleUpsert(req: Request, res: Response): Promise<void> {
+  const rawToken = req.headers['x-internal-token'];
+  const internalToken = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+  const expectedToken = process.env['INTERNAL_API_SECRET'];
+
+  if (!expectedToken || !internalToken || !safeCompareToken(internalToken, expectedToken)) {
+    res.status(401).json(fail('UNAUTHORIZED', 'Invalid internal token'));
+    return;
+  }
+
+  const { googleId, email, name, avatar } = req.body as {
+    googleId?: string;
+    email?: string;
+    name?: string;
+    avatar?: string;
+  };
+
+  if (!googleId || !email) {
+    res.status(422).json(fail('VALIDATION_ERROR', 'googleId and email are required'));
+    return;
+  }
+
+  const safeAvatar =
+    typeof avatar === 'string' && avatar.startsWith('https://')
+      ? avatar.slice(0, 500)
+      : null;
+
+  try {
+    const user = await service.googleUpsert(
+      googleId.trim(),
+      email.trim().toLowerCase(),
+      name?.trim().slice(0, 100),
+      safeAvatar ?? undefined,
+    );
+    res.json(ok({ id: user.id, email: user.email, name: user.name }));
+  } catch (e: unknown) {
+    const code = e instanceof Error ? e.message : 'INTERNAL';
+    res.status(500).json(fail(code, '伺服器錯誤'));
   }
 }

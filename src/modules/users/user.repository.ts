@@ -21,6 +21,10 @@ export class UserRepository {
       .getOne();
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.repo.findOne({ where: { googleId } });
+  }
+
   async create(data: Partial<User>): Promise<User> {
     return this.repo.save(this.repo.create(data));
   }
