@@ -77,14 +77,33 @@ describe('ItineraryService', () => {
   describe('updateItem', () => {
     it('should forward category and coverImage to repo.update', async () => {
       const mockItem = { id: 'item1', tripId: 't1', day: 1, title: 'Updated', category: 'lodging', coverImage: null, order: 0 };
+      mockRepo.prototype.findByIds.mockResolvedValue([mockItem as Itinerary]);
       mockRepo.prototype.update.mockResolvedValue(mockItem as any);
 
-      await service.updateItem('item1', { category: 'lodging', coverImage: undefined });
+      await service.updateItem('item1', 't1', { category: 'lodging', coverImage: undefined });
 
       expect(mockRepo.prototype.update).toHaveBeenCalledWith(
         'item1',
         expect.objectContaining({ category: 'lodging' }),
       );
+    });
+
+    it('should throw NOT_FOUND when item does not exist', async () => {
+      mockRepo.prototype.findByIds.mockResolvedValue([]);
+
+      await expect(
+        service.updateItem('ghost', 't1', { title: 'X' }),
+      ).rejects.toThrow('NOT_FOUND');
+    });
+
+    it('should throw FORBIDDEN when item belongs to a different trip', async () => {
+      mockRepo.prototype.findByIds.mockResolvedValue([
+        { id: 'item1', tripId: 'other-trip' } as Itinerary,
+      ]);
+
+      await expect(
+        service.updateItem('item1', 't1', { title: 'X' }),
+      ).rejects.toThrow('FORBIDDEN');
     });
   });
 });
