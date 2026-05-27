@@ -30,20 +30,32 @@ export function registerSocketHandlers(
   const userId = socket.data.userId as string;
   const email = socket.data.email as string;
 
-  socket.on('join_trip', async (tripId: unknown) => {
-    if (typeof tripId !== 'string' || !tripId.trim()) return;
+  socket.on('join_trip', async (tripId: unknown, ack?: () => void) => {
+    if (typeof tripId !== 'string' || !tripId.trim()) {
+      ack?.();
+      return;
+    }
+
+    // Already in room — membership was already verified; skip redundant DB check.
+    if (socket.rooms.has(`trip:${tripId}`)) {
+      ack?.();
+      return;
+    }
 
     try {
       const ok = checkMembership ? await checkMembership(userId, tripId) : true;
       if (!ok) {
         socket.leave(`trip:${tripId}`);
         socket.emit('error', { code: 'FORBIDDEN', message: 'Not a trip member' });
+        ack?.();
         return;
       }
       void socket.join(`trip:${tripId}`);
       socket.to(`trip:${tripId}`).emit('user:joined', { userId, email, tripId });
+      ack?.();
     } catch {
       socket.emit('error', { code: 'INTERNAL', message: 'Internal error' });
+      ack?.();
     }
   });
 

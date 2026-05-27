@@ -223,11 +223,12 @@ describe('Tier 2: join_trip membership validation', () => {
     checkMembership.mockClear();
     const socket = await connectClient(server.url, makeJwt(MEMBER_USER, 'member@test.com'));
     try {
-      socket.emit('join_trip', MEMBER_TRIP);
-      await new Promise((r) => setTimeout(r, 150));
+      // Use ack to guarantee the first join is fully processed (room joined, checkMembership
+      // resolved) before the second emit — eliminates the timing race entirely.
+      await new Promise<void>((resolve) => socket.emit('join_trip', MEMBER_TRIP, resolve));
 
-      socket.emit('join_trip', MEMBER_TRIP); // second join
-      await new Promise((r) => setTimeout(r, 150));
+      // Second join should short-circuit via socket.rooms.has() before touching checkMembership.
+      await new Promise<void>((resolve) => socket.emit('join_trip', MEMBER_TRIP, resolve));
 
       expect(checkMembership).toHaveBeenCalledTimes(1);
     } finally {
