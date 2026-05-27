@@ -40,7 +40,7 @@ function generateInviteCode(): string {
   return randomBytes(6).toString('hex').toUpperCase();
 }
 
-export interface HydratedMember extends TripMember {
+interface HydratedMember extends TripMember {
   name: string;
   email: string;
   avatar: string | null;
@@ -59,7 +59,7 @@ export interface TripPreview {
   memberCount: number;
 }
 
-export interface UnsettledDebt {
+interface UnsettledDebt {
   expenseId: string;
   description: string | null;
   amount: number;

@@ -38,7 +38,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/trips', tripRouter);
 app.use('/api/users', authMiddleware, userRouter);
 
-export const httpServer = createServer(app);
+const httpServer = createServer(app);
 
 const PORT = process.env.PORT ?? 4000;
 

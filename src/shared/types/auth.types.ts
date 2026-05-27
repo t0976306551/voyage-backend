@@ -1,6 +1,6 @@
 import type { CollaboratorPermissions, TripRole } from '../../modules/trips/trip.entity';
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   email: string;
   name?: string;
