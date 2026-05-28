@@ -28,5 +28,10 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Trip, Itinerary, Expense, Task, Attachment, ChecklistItem, ChecklistAssignment, TripInvitation, InvitationHistory, PersonalMemo, PersonalMemoItem, PersonalExpense, PersonalSettings],
-  migrations: ['src/migrations/*.ts'],
+  // Production: point to compiled JS; dev: TypeScript source via ts-node
+  migrations: [
+    process.env.NODE_ENV === 'production'
+      ? `${__dirname}/migrations/*.js`
+      : 'src/migrations/*.ts'
+  ],
 });

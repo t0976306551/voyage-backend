@@ -44,7 +44,12 @@ const PORT = process.env.PORT ?? 4000;
 
 if (process.env.NODE_ENV !== 'test') {
   AppDataSource.initialize()
-    .then(() => {
+    .then(async (ds) => {
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[db] Running migrations...');
+        await ds.runMigrations();
+        console.log('[db] Migrations complete.');
+      }
       initSocketIO(httpServer);
       httpServer.listen(PORT, () => {
         console.log(`voyage-backend running on port ${PORT}`);
