@@ -28,15 +28,16 @@ export class TasksService {
   }
 
   async create(dto: CreateTaskDto): Promise<Task> {
-    return this.repo.create({
+    const data: Partial<Task> = {
       tripId: dto.tripId,
       title: dto.title,
       category: dto.category ?? 'general',
       status: dto.status ?? 'todo',
-      ...(dto.assignedUserId !== undefined ? { assignedUserId: dto.assignedUserId } : {}),
-      ...(dto.dueDate !== undefined ? { dueDate: dto.dueDate ?? undefined } : {}),
-      ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-    } as Partial<Task>);
+    };
+    if (dto.assignedUserId !== undefined) data.assignedUserId = dto.assignedUserId;
+    if (dto.dueDate !== undefined) data.dueDate = dto.dueDate ?? undefined;
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    return this.repo.create(data);
   }
 
   async update(id: string, tripId: string, dto: UpdateTaskDto): Promise<Task> {

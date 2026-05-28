@@ -3,15 +3,9 @@ import { ExpensesService } from './expenses.service';
 import { ExpensesRepository } from './expenses.repository';
 import { ok, fail } from '../../shared/types/response.types';
 import { broadcastToTrip } from '../../socket/broadcaster';
+import { ALLOWED_CURRENCIES, MAX_AMOUNT, MAX_DESCRIPTION_LENGTH, UUID_REGEX } from '../../shared/constants/validation';
 
 const service = new ExpensesService(new ExpensesRepository());
-
-const ALLOWED_CURRENCIES = new Set([
-  'TWD', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'HKD', 'SGD', 'KRW',
-  'CNY', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'INR', 'CHF', 'NZD', 'SEK',
-  'NOK', 'DKK', 'BRL', 'ZAR', 'MXN', 'AED', 'SAR', 'TRY', 'ILS', 'CZK',
-]);
-const MAX_AMOUNT = 10_000_000;
 
 export async function listExpenses(req: Request, res: Response): Promise<void> {
   try {
@@ -53,14 +47,13 @@ export async function createExpense(req: Request, res: Response): Promise<void> 
         return;
       }
       let splitTotal = 0;
-      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const entries = Object.entries(body.splitInfo);
       if (entries.length > 50) {
         res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must not have more than 50 entries'));
         return;
       }
       for (const [k, v] of entries) {
-        if (!k || !UUID_RE.test(k)) {
+        if (!k || !UUID_REGEX.test(k)) {
           res.status(400).json(fail('INVALID_SPLIT', 'splitInfo keys must be valid user UUIDs'));
           return;
         }
@@ -75,8 +68,8 @@ export async function createExpense(req: Request, res: Response): Promise<void> 
         return;
       }
     }
-    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {
-      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > MAX_DESCRIPTION_LENGTH) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`));
       return;
     }
     const item = await service.create({
@@ -136,8 +129,8 @@ export async function updateExpense(req: Request, res: Response): Promise<void> 
         return;
       }
     }
-    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {
-      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > MAX_DESCRIPTION_LENGTH) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`));
       return;
     }
     const item = await service.update(id, tripId, body);

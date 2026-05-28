@@ -254,7 +254,8 @@ export class TripService {
     const target = trip.members.find((m) => m.userId === targetUserId);
     if (!target) throw new Error('NOT_MEMBER');
     if (target.role === 'Owner') {
-      throw new Error(targetUserId === callerUserId ? 'CANNOT_LEAVE_AS_OWNER' : 'CANNOT_KICK_OWNER');
+      const errorCode = targetUserId === callerUserId ? 'CANNOT_LEAVE_AS_OWNER' : 'CANNOT_KICK_OWNER';
+      throw new Error(errorCode);
     }
 
     // Hydrate user names for target + payers
@@ -296,11 +297,9 @@ export class TripService {
       where: { tripId, payerId: targetUserId },
     });
 
-    const personalCounts = await personalRepo.countMemosByUser(tripId, targetUserId)
-      .then(async (memos) => ({
-        memos,
-        expenses: await personalRepo.countExpensesByUser(tripId, targetUserId),
-      }));
+    const personalMemos = await personalRepo.countMemosByUser(tripId, targetUserId);
+    const personalExpenses = await personalRepo.countExpensesByUser(tripId, targetUserId);
+    const personalCounts = { memos: personalMemos, expenses: personalExpenses };
 
     const canRemove = unsettledDebts.length === 0;
     const result: LeavePreview = {

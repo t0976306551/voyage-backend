@@ -1,4 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import type { FindOptionsSelect } from 'typeorm';
 
 interface ReorderPayload {
   tripId: string;
@@ -15,9 +16,10 @@ interface EditingPayload {
 async function defaultCheckMembership(userId: string, tripId: string): Promise<boolean> {
   const { AppDataSource } = await import('../data-source');
   const { Trip } = await import('../modules/trips/trip.entity');
+  type TripEntity = InstanceType<typeof Trip>;
   const trip = await AppDataSource.getRepository(Trip).findOne({
     where: { id: tripId },
-    select: ['id', 'members'] as any,
+    select: { id: true, members: true } as FindOptionsSelect<TripEntity>,
   });
   return trip?.members.some((m) => m.userId === userId) ?? false;
 }

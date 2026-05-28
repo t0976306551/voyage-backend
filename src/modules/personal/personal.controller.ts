@@ -4,14 +4,9 @@ import { PersonalRepository } from './personal.repository';
 import { ok, fail } from '../../shared/types/response.types';
 import { PersonalExpenseCategory } from './personal-expense.entity';
 import { broadcastToTrip } from '../../socket/broadcaster';
+import { ALLOWED_CURRENCIES, MAX_AMOUNT, MAX_DESCRIPTION_LENGTH } from '../../shared/constants/validation';
 
 const VALID_CATEGORIES: PersonalExpenseCategory[] = ['food', 'transport', 'lodging', 'shopping', 'activity', 'other'];
-
-const ALLOWED_CURRENCIES = new Set([
-  'TWD', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'HKD', 'SGD', 'KRW',
-  'CNY', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'INR', 'CHF', 'NZD', 'SEK',
-  'NOK', 'DKK', 'BRL', 'ZAR', 'MXN', 'AED', 'SAR', 'TRY', 'ILS', 'CZK',
-]);
 
 const service = new PersonalService(new PersonalRepository());
 
@@ -177,7 +172,6 @@ personalRouter.post('/expenses', async (req: Request, res: Response) => {
       category?: PersonalExpenseCategory;
       spentAt?: string | null;
     };
-    const MAX_AMOUNT = 10_000_000;
     if (body.amount === undefined || typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT) {
       res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
       return;
@@ -192,8 +186,8 @@ personalRouter.post('/expenses', async (req: Request, res: Response) => {
         return;
       }
     }
-    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > 1000) {
-      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
+    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > MAX_DESCRIPTION_LENGTH) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`));
       return;
     }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
@@ -215,9 +209,8 @@ personalRouter.patch('/expenses/:expenseId', async (req: Request, res: Response)
       category?: PersonalExpenseCategory;
       spentAt?: string | null;
     };
-    const MAX_AMOUNT_PATCH = 10_000_000;
-    if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT_PATCH)) {
-      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT_PATCH}`));
+    if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT)) {
+      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
       return;
     }
     if (body.currency !== undefined && body.currency !== null && typeof body.currency === 'string' && !ALLOWED_CURRENCIES.has(body.currency)) {
@@ -230,8 +223,8 @@ personalRouter.patch('/expenses/:expenseId', async (req: Request, res: Response)
         return;
       }
     }
-    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > 1000) {
-      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
+    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > MAX_DESCRIPTION_LENGTH) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`));
       return;
     }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {

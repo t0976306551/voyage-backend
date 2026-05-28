@@ -77,7 +77,7 @@ router.post(
     const trip = await tripRepo.findById(tripId);
     if (!trip) return void res.status(404).json({ error: 'NOT_FOUND' });
 
-    if (trip.members.some((m: any) => m.userId === invitedUser.id)) {
+    if (trip.members.some((m: { userId: string }) => m.userId === invitedUser.id)) {
       return void res.status(409).json({ error: 'ALREADY_MEMBER' });
     }
 
