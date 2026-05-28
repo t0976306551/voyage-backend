@@ -6,6 +6,13 @@ import { broadcastToTrip } from '../../socket/broadcaster';
 
 const service = new ExpensesService(new ExpensesRepository());
 
+const ALLOWED_CURRENCIES = new Set([
+  'TWD', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'HKD', 'SGD', 'KRW',
+  'CNY', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'INR', 'CHF', 'NZD', 'SEK',
+  'NOK', 'DKK', 'BRL', 'ZAR', 'MXN', 'AED', 'SAR', 'TRY', 'ILS', 'CZK',
+]);
+const MAX_AMOUNT = 10_000_000;
+
 export async function listExpenses(req: Request, res: Response): Promise<void> {
   try {
     const tripId = req.params['tripId'] as string;
@@ -32,12 +39,28 @@ export async function createExpense(req: Request, res: Response): Promise<void> 
       res.status(400).json(fail('INVALID_PAYER', 'payerId is required'));
       return;
     }
-    if (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0) {
-      res.status(400).json(fail('INVALID_AMOUNT', 'amount must be a positive number'));
+    if (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT) {
+      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
       return;
     }
-    if (body.splitInfo && typeof body.splitInfo !== 'object') {
-      res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must be an object'));
+    if (body.currency !== undefined && !ALLOWED_CURRENCIES.has(body.currency)) {
+      res.status(400).json(fail('INVALID_CURRENCY', 'Unsupported currency code'));
+      return;
+    }
+    if (body.splitInfo !== null && body.splitInfo !== undefined) {
+      if (typeof body.splitInfo !== 'object' || Array.isArray(body.splitInfo)) {
+        res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must be an object'));
+        return;
+      }
+      for (const [k, v] of Object.entries(body.splitInfo)) {
+        if (!k || typeof v !== 'number' || !isFinite(v) || v < 0) {
+          res.status(400).json(fail('INVALID_SPLIT', 'splitInfo values must be non-negative numbers'));
+          return;
+        }
+      }
+    }
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
       return;
     }
     const item = await service.create({
@@ -70,8 +93,28 @@ export async function updateExpense(req: Request, res: Response): Promise<void> 
       description?: string;
       splitInfo?: Record<string, number>;
     };
-    if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0)) {
-      res.status(400).json(fail('INVALID_AMOUNT', 'amount must be a positive number'));
+    if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT)) {
+      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
+      return;
+    }
+    if (body.currency !== undefined && !ALLOWED_CURRENCIES.has(body.currency)) {
+      res.status(400).json(fail('INVALID_CURRENCY', 'Unsupported currency code'));
+      return;
+    }
+    if (body.splitInfo !== null && body.splitInfo !== undefined) {
+      if (typeof body.splitInfo !== 'object' || Array.isArray(body.splitInfo)) {
+        res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must be an object'));
+        return;
+      }
+      for (const [k, v] of Object.entries(body.splitInfo)) {
+        if (!k || typeof v !== 'number' || !isFinite(v) || v < 0) {
+          res.status(400).json(fail('INVALID_SPLIT', 'splitInfo values must be non-negative numbers'));
+          return;
+        }
+      }
+    }
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
       return;
     }
     const item = await service.update(id, tripId, body);

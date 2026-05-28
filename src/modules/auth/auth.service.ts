@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { QueryFailedError } from 'typeorm';
 import { UserRepository } from '../users/user.repository';
 import { signJWT } from '../../shared/utils/sign-jwt.utils';
@@ -114,7 +115,8 @@ export class AuthService {
 
   private generateHandle(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const suffix = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * 36)]).join('');
+    const bytes = randomBytes(5);
+    const suffix = Array.from(bytes, (b) => chars[b % 36]).join('');
     return `vs_${suffix}`;
   }
 

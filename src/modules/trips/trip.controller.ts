@@ -55,7 +55,31 @@ export async function getTripById(req: Request, res: Response): Promise<void> {
 
 export async function createTrip(req: Request, res: Response): Promise<void> {
   try {
-    const trip = await service.createTrip(req.body as { title: string; startDate?: string; endDate?: string }, req.user!.id);
+    const body = req.body as { title?: unknown; startDate?: unknown; endDate?: unknown };
+    if (!body.title || typeof body.title !== 'string' || body.title.trim().length === 0) {
+      res.status(400).json(fail('INVALID_TITLE', 'title is required'));
+      return;
+    }
+    if (body.title.length > 255) {
+      res.status(400).json(fail('INVALID_TITLE', 'title must be at most 255 characters'));
+      return;
+    }
+    if (body.startDate !== undefined && body.startDate !== null && !parseIsoDate(body.startDate)) {
+      res.status(400).json(fail('INVALID_DATE', 'startDate must be a valid YYYY-MM-DD date'));
+      return;
+    }
+    if (body.endDate !== undefined && body.endDate !== null && !parseIsoDate(body.endDate)) {
+      res.status(400).json(fail('INVALID_DATE', 'endDate must be a valid YYYY-MM-DD date'));
+      return;
+    }
+    if (body.startDate && body.endDate && String(body.startDate) > String(body.endDate)) {
+      res.status(400).json(fail('INVALID_DATE_RANGE', 'startDate cannot be after endDate'));
+      return;
+    }
+    const trip = await service.createTrip(
+      { title: body.title, startDate: body.startDate as string | undefined, endDate: body.endDate as string | undefined },
+      req.user!.id,
+    );
     res.status(201).json(ok(trip));
   } catch {
     res.status(500).json(fail('INTERNAL', 'Internal server error'));
@@ -70,10 +94,39 @@ export async function updateTrip(req: Request, res: Response): Promise<void> {
     }
     const { title, startDate, endDate, coverImage } = req.body as Record<string, string>;
     const dto: Record<string, string> = {};
-    if (title !== undefined) dto['title'] = title;
-    if (startDate !== undefined) dto['startDate'] = startDate;
-    if (endDate !== undefined) dto['endDate'] = endDate;
-    if (coverImage !== undefined) dto['coverImage'] = coverImage;
+    if (title !== undefined) {
+      if (typeof title !== 'string' || title.length > 255) {
+        res.status(400).json(fail('INVALID_TITLE', 'title must be at most 255 characters'));
+        return;
+      }
+      dto['title'] = title;
+    }
+    if (startDate !== undefined) {
+      if (!parseIsoDate(startDate)) {
+        res.status(400).json(fail('INVALID_DATE', 'startDate must be a valid YYYY-MM-DD date'));
+        return;
+      }
+      dto['startDate'] = startDate;
+    }
+    if (endDate !== undefined) {
+      if (!parseIsoDate(endDate)) {
+        res.status(400).json(fail('INVALID_DATE', 'endDate must be a valid YYYY-MM-DD date'));
+        return;
+      }
+      dto['endDate'] = endDate;
+    }
+    if (dto['startDate'] && dto['endDate'] && dto['startDate'] > dto['endDate']) {
+      res.status(400).json(fail('INVALID_DATE_RANGE', 'startDate cannot be after endDate'));
+      return;
+    }
+    if (coverImage !== undefined) {
+      if (typeof coverImage === 'string' && coverImage !== '' &&
+          !coverImage.startsWith('/uploads/') && !/^https?:\/\//i.test(coverImage)) {
+        res.status(400).json(fail('INVALID_COVER', 'coverImage must be a valid upload path or https URL'));
+        return;
+      }
+      dto['coverImage'] = coverImage;
+    }
     const tripId = req.params['tripId'] as string;
     const trip = await service.updateTrip(tripId, dto, req.user!.id);
     broadcastToTrip(tripId, 'trip:updated', { tripId, trip });

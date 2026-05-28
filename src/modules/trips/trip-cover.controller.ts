@@ -23,12 +23,19 @@ const storage = multer.diskStorage({
 });
 
 const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_EXTENSIONS = /^\.(jpg|jpeg|png|webp)$/;
 
 export const coverUploadMiddleware = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIMES.has(file.mimetype)) {
+      cb(new Error('INVALID_MIME'));
+      return;
+    }
+    // Double-check extension to reject spoofed MIME types
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext && !ALLOWED_EXTENSIONS.test(ext)) {
       cb(new Error('INVALID_MIME'));
       return;
     }
@@ -57,7 +64,7 @@ export async function uploadTripCover(req: Request, res: Response): Promise<void
     const msg = e instanceof Error ? e.message : 'UNKNOWN';
     if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
     else if (msg === 'FORBIDDEN') res.status(403).json(fail('FORBIDDEN', 'Not allowed'));
-    else res.status(500).json(fail('INTERNAL', msg));
+    else res.status(500).json(fail('INTERNAL', 'Upload failed'));
   }
 }
 

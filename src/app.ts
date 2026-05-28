@@ -22,12 +22,14 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Static uploads — referenced from trip.coverImage etc.
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
   maxAge: '7d',
   fallthrough: true,
+  index: false,
+  dotfiles: 'deny',
 }));
 
 app.get('/health', (_req, res) => {

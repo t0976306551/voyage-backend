@@ -171,8 +171,19 @@ personalRouter.post('/expenses', async (req: Request, res: Response) => {
       category?: PersonalExpenseCategory;
       spentAt?: string | null;
     };
-    if (body.amount === undefined || typeof body.amount !== 'number') {
-      res.status(400).json(fail('INVALID_AMOUNT', 'amount (number) is required'));
+    const MAX_AMOUNT = 10_000_000;
+    if (body.amount === undefined || typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT) {
+      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
+      return;
+    }
+    if (body.spentAt !== undefined && body.spentAt !== null && body.spentAt !== '') {
+      if (typeof body.spentAt !== 'string' || isNaN(new Date(body.spentAt).getTime())) {
+        res.status(400).json(fail('INVALID_DATE', 'spentAt must be a valid date string'));
+        return;
+      }
+    }
+    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > 1000) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
       return;
     }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
@@ -194,6 +205,21 @@ personalRouter.patch('/expenses/:expenseId', async (req: Request, res: Response)
       category?: PersonalExpenseCategory;
       spentAt?: string | null;
     };
+    const MAX_AMOUNT_PATCH = 10_000_000;
+    if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT_PATCH)) {
+      res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT_PATCH}`));
+      return;
+    }
+    if (body.spentAt !== undefined && body.spentAt !== null && body.spentAt !== '') {
+      if (typeof body.spentAt !== 'string' || isNaN(new Date(body.spentAt).getTime())) {
+        res.status(400).json(fail('INVALID_DATE', 'spentAt must be a valid date string'));
+        return;
+      }
+    }
+    if (body.description !== undefined && body.description !== null && typeof body.description === 'string' && body.description.length > 1000) {
+      res.status(400).json(fail('DESCRIPTION_TOO_LONG', 'description must be at most 1000 characters'));
+      return;
+    }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category'));
       return;

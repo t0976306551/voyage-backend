@@ -37,6 +37,20 @@ export async function createTask(req: Request, res: Response): Promise<void> {
       res.status(400).json(fail('INVALID_TITLE', 'title is required'));
       return;
     }
+    if (body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.dueDate !== undefined && body.dueDate !== null && body.dueDate !== '') {
+      if (typeof body.dueDate !== 'string' || isNaN(new Date(body.dueDate).getTime())) {
+        res.status(400).json(fail('INVALID_DATE', 'dueDate must be a valid date string'));
+        return;
+      }
+    }
+    if (body.notes !== undefined && body.notes !== null && typeof body.notes === 'string' && body.notes.length > 5000) {
+      res.status(400).json(fail('NOTES_TOO_LONG', 'notes must be at most 5000 characters'));
+      return;
+    }
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category'));
       return;
@@ -91,6 +105,20 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
     }
     if (body.title !== undefined && (typeof body.title !== 'string' || body.title.trim().length === 0)) {
       res.status(400).json(fail('INVALID_TITLE', 'title cannot be empty'));
+      return;
+    }
+    if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.dueDate !== undefined && body.dueDate !== null && body.dueDate !== '') {
+      if (typeof body.dueDate !== 'string' || isNaN(new Date(body.dueDate).getTime())) {
+        res.status(400).json(fail('INVALID_DATE', 'dueDate must be a valid date string'));
+        return;
+      }
+    }
+    if (body.notes !== undefined && body.notes !== null && typeof body.notes === 'string' && body.notes.length > 5000) {
+      res.status(400).json(fail('NOTES_TOO_LONG', 'notes must be at most 5000 characters'));
       return;
     }
     const item = await service.update(id, tripId, body);

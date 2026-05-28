@@ -24,6 +24,14 @@ export async function createChecklist(req: Request, res: Response): Promise<void
     // 角色檢查已在 router 的 requireTripRole('Owner','Editor') 完成。
     const tripId = req.params['tripId'] as string;
     const body = req.body as { title?: string; notes?: string | null; assigneeIds?: string[] };
+    if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.notes !== undefined && body.notes !== null && typeof body.notes === 'string' && body.notes.length > 5000) {
+      res.status(400).json(fail('NOTES_TOO_LONG', 'notes must be at most 5000 characters'));
+      return;
+    }
     const item = await service.create({
       tripId,
       title: body.title ?? '',
@@ -50,6 +58,14 @@ export async function updateChecklist(req: Request, res: Response): Promise<void
     const tripId = req.params['tripId'] as string;
     const itemId = req.params['itemId'] as string;
     const body = req.body as { title?: string; notes?: string | null; assigneeIds?: string[] };
+    if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.notes !== undefined && body.notes !== null && typeof body.notes === 'string' && body.notes.length > 5000) {
+      res.status(400).json(fail('NOTES_TOO_LONG', 'notes must be at most 5000 characters'));
+      return;
+    }
     const item = await service.update(itemId, tripId, body, req.user!.id);
     broadcastToTrip(tripId, 'checklist:item:updated', { tripId, item });
     res.json(ok(item));

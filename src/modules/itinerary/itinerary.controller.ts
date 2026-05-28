@@ -86,6 +86,26 @@ export async function createItem(req: Request, res: Response): Promise<void> {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category value'));
       return;
     }
+    if (body.day !== undefined && body.day !== null) {
+      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1) {
+        res.status(400).json(fail('INVALID_DAY', 'day must be a positive integer'));
+        return;
+      }
+    }
+    if (body.sourceUrl !== undefined && body.sourceUrl !== null && body.sourceUrl !== '') {
+      if (typeof body.sourceUrl !== 'string' || !/^https?:\/\//i.test(body.sourceUrl)) {
+        res.status(400).json(fail('INVALID_URL', 'sourceUrl must be a valid http/https URL'));
+        return;
+      }
+    }
+    if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.note !== undefined && body.note !== null && typeof body.note === 'string' && body.note.length > 5000) {
+      res.status(400).json(fail('NOTE_TOO_LONG', 'note must be at most 5000 characters'));
+      return;
+    }
     const { error, code } = validateExtras(body);
     if (error) {
       res.status(400).json(fail(code!, error));
@@ -127,6 +147,26 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
     };
     if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category as 'food')) {
       res.status(400).json(fail('INVALID_CATEGORY', 'Invalid category value'));
+      return;
+    }
+    if (body.day !== undefined && body.day !== null) {
+      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1) {
+        res.status(400).json(fail('INVALID_DAY', 'day must be a positive integer'));
+        return;
+      }
+    }
+    if (body.sourceUrl !== undefined && body.sourceUrl !== null && body.sourceUrl !== '') {
+      if (typeof body.sourceUrl !== 'string' || !/^https?:\/\//i.test(body.sourceUrl)) {
+        res.status(400).json(fail('INVALID_URL', 'sourceUrl must be a valid http/https URL'));
+        return;
+      }
+    }
+    if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 500) {
+      res.status(400).json(fail('TITLE_TOO_LONG', 'title must be at most 500 characters'));
+      return;
+    }
+    if (body.note !== undefined && body.note !== null && typeof body.note === 'string' && body.note.length > 5000) {
+      res.status(400).json(fail('NOTE_TOO_LONG', 'note must be at most 5000 characters'));
       return;
     }
     const { error, code } = validateExtras(body);
