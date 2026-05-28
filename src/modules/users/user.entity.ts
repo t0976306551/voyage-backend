@@ -37,6 +37,9 @@ export class User {
   @Column('text', { array: true, name: 'auth_providers', default: '{}' })
   authProviders!: string[];
 
+  @Column({ name: 'token_revoked_before', type: 'timestamptz', nullable: true, default: null })
+  tokenRevokedBefore!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

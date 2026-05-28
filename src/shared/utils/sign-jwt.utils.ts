@@ -10,8 +10,9 @@ export function signJWT(
   expiresInSeconds = 30 * 24 * 60 * 60,
 ): string {
   const header = b64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
-  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const body = b64url(Buffer.from(JSON.stringify({ ...payload, exp })));
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + expiresInSeconds;
+  const body = b64url(Buffer.from(JSON.stringify({ ...payload, iat, exp })));
   const sig = b64url(createHmac('sha256', secret).update(`${header}.${body}`).digest());
   return `${header}.${body}.${sig}`;
 }

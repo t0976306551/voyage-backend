@@ -5,7 +5,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.DELETE_TOKEN_SECRET) {
 }
 
 const SECRET = process.env.DELETE_TOKEN_SECRET ?? 'dev-delete-secret-NOT-FOR-PRODUCTION';
-const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Alphanumeric without visually ambiguous characters (0/O, 1/l/I)
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';

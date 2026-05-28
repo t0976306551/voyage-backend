@@ -3,6 +3,8 @@ import { timingSafeEqual } from 'crypto';
 import { AuthService } from './auth.service';
 import { UserRepository } from '../users/user.repository';
 import { ok, fail } from '../../shared/types/response.types';
+import { AppDataSource } from '../../data-source';
+import { User } from '../users/user.entity';
 
 const service = new AuthService(new UserRepository());
 
@@ -29,6 +31,13 @@ const ERROR_MSG: Record<string, string> = {
   EMAIL_GOOGLE_ONLY: '請使用 Google 登入',
   INVALID_CREDENTIALS: 'Email 或密碼錯誤',
 };
+
+const KNOWN_CODES = new Set(Object.keys(ERROR_STATUS));
+
+function safeCode(e: unknown): string {
+  const raw = e instanceof Error ? e.message : '';
+  return KNOWN_CODES.has(raw) ? raw : 'INTERNAL';
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, password, name } = req.body as { email?: string; password?: string; name?: string };
@@ -66,7 +75,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     const result = await service.register(email.trim().toLowerCase(), password, name.trim());
     res.status(201).json(ok(result));
   } catch (e: unknown) {
-    const code = e instanceof Error ? e.message : 'INTERNAL';
+    const code = safeCode(e);
     res.status(ERROR_STATUS[code] ?? 500).json(fail(code, ERROR_MSG[code] ?? '伺服器錯誤'));
   }
 }
@@ -87,7 +96,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     const result = await service.login(email.trim().toLowerCase(), password);
     res.json(ok(result));
   } catch (e: unknown) {
-    const code = e instanceof Error ? e.message : 'INTERNAL';
+    const code = safeCode(e);
     res.status(ERROR_STATUS[code] ?? 500).json(fail(code, ERROR_MSG[code] ?? '伺服器錯誤'));
   }
 }
@@ -135,8 +144,19 @@ export async function googleUpsert(req: Request, res: Response): Promise<void> {
       safeAvatar ?? undefined,
     );
     res.json(ok({ id: user.id, email: user.email, name: user.name }));
-  } catch (e: unknown) {
-    const code = e instanceof Error ? e.message : 'INTERNAL';
-    res.status(500).json(fail(code, '伺服器錯誤'));
+  } catch {
+    res.status(500).json(fail('INTERNAL', '伺服器錯誤'));
+  }
+}
+
+export async function logout(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    await AppDataSource.getRepository(User).update(userId, {
+      tokenRevokedBefore: new Date(),
+    });
+    res.json(ok({ ok: true }));
+  } catch {
+    res.status(500).json(fail('INTERNAL', '伺服器錯誤'));
   }
 }

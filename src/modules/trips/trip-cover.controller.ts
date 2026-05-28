@@ -6,6 +6,30 @@ import { TripService } from './trip.service';
 import { TripRepository } from './trip.repository';
 import { ok, fail } from '../../shared/types/response.types';
 
+function isSupportedImageMagicBytes(buf: Buffer): boolean {
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true;
+  // WebP: RIFF....WEBP (bytes 0-3 = RIFF, bytes 8-11 = WEBP)
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) return true;
+  return false;
+}
+
+function readMagicBytes(filePath: string): Buffer {
+  const buf = Buffer.alloc(12);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(fd, buf, 0, 12, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  return buf;
+}
+
 const UPLOADS_ROOT = path.join(process.cwd(), 'uploads');
 
 const storage = multer.diskStorage({
@@ -57,6 +81,16 @@ export async function uploadTripCover(req: Request, res: Response): Promise<void
       res.status(400).json(fail('NO_FILE', 'cover file is required'));
       return;
     }
+
+    // Secondary magic-bytes check: multer's mimetype is browser-supplied and spoofable.
+    // Read the actual file bytes to confirm the format.
+    const magic = readMagicBytes(file.path);
+    if (!isSupportedImageMagicBytes(magic)) {
+      fs.unlinkSync(file.path);
+      res.status(415).json(fail('INVALID_MIME', '只接受 JPG / PNG / WEBP 格式'));
+      return;
+    }
+
     const url = `/uploads/trips/${tripId}/${file.filename}`;
     const trip = await service.updateTrip(tripId, { coverImage: url }, req.user!.id);
     res.json(ok(trip));
