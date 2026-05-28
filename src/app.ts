@@ -10,6 +10,7 @@ import tripRouter from './modules/trips/trip.router';
 import authRouter from './modules/auth/auth.router';
 import { userRouter } from './modules/users/user.controller';
 import { authMiddleware } from './shared/middleware/auth.middleware';
+import { authLimiter, joinLimiter, generalApiLimiter } from './shared/middleware/rate-limit.middleware';
 import { initSocketIO } from './socket/socket.service';
 import { AppDataSource } from './data-source';
 
@@ -36,6 +37,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use('/api', generalApiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/trips/join', joinLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/trips', tripRouter);
 app.use('/api/users', authMiddleware, userRouter);

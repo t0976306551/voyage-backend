@@ -37,12 +37,28 @@ export async function register(req: Request, res: Response): Promise<void> {
     res.status(422).json(fail('VALIDATION_ERROR', 'email, password, name are required'));
     return;
   }
-  if (!email.includes('@')) {
+  if (email.trim().length > 254) {
+    res.status(422).json(fail('VALIDATION_ERROR', 'Email 過長（最多 254 字元）'));
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     res.status(422).json(fail('VALIDATION_ERROR', '請輸入有效的 Email'));
     return;
   }
   if (password.length < 8) {
     res.status(422).json(fail('VALIDATION_ERROR', '密碼至少 8 個字元'));
+    return;
+  }
+  if (password.length > 128) {
+    res.status(422).json(fail('VALIDATION_ERROR', '密碼最多 128 個字元'));
+    return;
+  }
+  if (name.trim().length === 0) {
+    res.status(422).json(fail('VALIDATION_ERROR', '請輸入名稱'));
+    return;
+  }
+  if (name.trim().length > 100) {
+    res.status(422).json(fail('VALIDATION_ERROR', '名稱最多 100 個字元'));
     return;
   }
 
@@ -60,6 +76,10 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   if (!email || !password) {
     res.status(422).json(fail('VALIDATION_ERROR', 'email and password are required'));
+    return;
+  }
+  if (email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    res.status(422).json(fail('VALIDATION_ERROR', '請輸入有效的 Email'));
     return;
   }
 
@@ -91,6 +111,14 @@ export async function googleUpsert(req: Request, res: Response): Promise<void> {
 
   if (!googleId || !email) {
     res.status(422).json(fail('VALIDATION_ERROR', 'googleId and email are required'));
+    return;
+  }
+  if (googleId.trim().length > 50) {
+    res.status(422).json(fail('VALIDATION_ERROR', 'googleId 過長'));
+    return;
+  }
+  if (email.trim().length > 254) {
+    res.status(422).json(fail('VALIDATION_ERROR', 'Email 過長（最多 254 字元）'));
     return;
   }
 

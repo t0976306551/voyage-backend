@@ -2,6 +2,57 @@ import { generateDeleteToken, verifyDeleteToken } from '../../../src/modules/tri
 
 const TRIP_ID = 'trip-abc-123';
 
+// ---------------------------------------------------------------------------
+// Fail-fast: production env must have DELETE_TOKEN_SECRET
+// ---------------------------------------------------------------------------
+describe('delete-token production fail-fast', () => {
+  const originalEnv = process.env.NODE_ENV;
+  const originalSecret = process.env.DELETE_TOKEN_SECRET;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalEnv;
+    if (originalSecret === undefined) {
+      delete process.env.DELETE_TOKEN_SECRET;
+    } else {
+      process.env.DELETE_TOKEN_SECRET = originalSecret;
+    }
+    jest.resetModules();
+  });
+
+  it('throws at module load in production when DELETE_TOKEN_SECRET is missing', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.DELETE_TOKEN_SECRET;
+
+    expect(() => {
+      jest.isolateModules(() => {
+        require('../../../src/modules/trips/delete-token.util');
+      });
+    }).toThrow('DELETE_TOKEN_SECRET env var must be set in production');
+  });
+
+  it('does NOT throw in production when DELETE_TOKEN_SECRET is set', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.DELETE_TOKEN_SECRET = 'a-real-production-secret-that-is-long-enough';
+
+    expect(() => {
+      jest.isolateModules(() => {
+        require('../../../src/modules/trips/delete-token.util');
+      });
+    }).not.toThrow();
+  });
+
+  it('does NOT throw in development when DELETE_TOKEN_SECRET is missing', () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.DELETE_TOKEN_SECRET;
+
+    expect(() => {
+      jest.isolateModules(() => {
+        require('../../../src/modules/trips/delete-token.util');
+      });
+    }).not.toThrow();
+  });
+});
+
 describe('delete-token util', () => {
   describe('generateDeleteToken', () => {
     it('returns an 8-character alphanumeric code', () => {

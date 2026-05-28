@@ -65,6 +65,9 @@ router.post(
     }
     const handle = typeof req.body?.handle === 'string' ? req.body.handle.trim().toUpperCase() : null;
     if (!handle) return void res.status(400).json({ error: 'MISSING_HANDLE' });
+    if (!/^[A-Z0-9_]{2,30}$/.test(handle)) {
+      return void res.status(400).json({ error: 'INVALID_HANDLE', message: 'handle must contain only letters, digits, and underscores (2–30 characters)' });
+    }
 
     const invitedUser = await userRepo.findByHandle(handle);
     if (!invitedUser) return void res.status(404).json({ error: 'USER_NOT_FOUND' });

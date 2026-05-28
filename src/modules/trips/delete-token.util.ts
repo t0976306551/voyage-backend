@@ -1,6 +1,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
-const SECRET = process.env.DELETE_TOKEN_SECRET ?? 'dev-delete-secret';
+if (process.env.NODE_ENV === 'production' && !process.env.DELETE_TOKEN_SECRET) {
+  throw new Error('[delete-token] DELETE_TOKEN_SECRET env var must be set in production');
+}
+
+const SECRET = process.env.DELETE_TOKEN_SECRET ?? 'dev-delete-secret-NOT-FOR-PRODUCTION';
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Alphanumeric without visually ambiguous characters (0/O, 1/l/I)

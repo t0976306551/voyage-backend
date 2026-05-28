@@ -95,4 +95,47 @@ describe('AuthService', () => {
       expect(result.token.split('.').length).toBe(3);
     });
   });
+
+  describe('generateHandle — CSPRNG-based handle generation', () => {
+    // generateHandle() is private; cast to any to test it directly.
+    function callGenerateHandle(svc: AuthService): string {
+      return (svc as unknown as { generateHandle(): string }).generateHandle();
+    }
+
+    it('produces a handle matching vs_[A-Z0-9]{5}', () => {
+      const handle = callGenerateHandle(service);
+      expect(handle).toMatch(/^vs_[A-Z0-9]{5}$/);
+    });
+
+    it('never calls Math.random', () => {
+      const spy = jest.spyOn(Math, 'random');
+      callGenerateHandle(service);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('produces unique handles on repeated calls (statistically)', () => {
+      const handles = new Set<string>();
+      for (let i = 0; i < 20; i++) {
+        handles.add(callGenerateHandle(service));
+      }
+      // 20 calls from 36^5 = 60 million possibilities — collision probability is negligible.
+      // If Math.random (deterministic seed in Jest) were used, we might see repeats.
+      expect(handles.size).toBeGreaterThan(1);
+    });
+
+    it('handle suffix uses only uppercase letters and digits', () => {
+      for (let i = 0; i < 10; i++) {
+        const handle = callGenerateHandle(service);
+        const suffix = handle.slice(3); // strip "vs_"
+        expect(suffix).toMatch(/^[A-Z0-9]{5}$/);
+      }
+    });
+
+    it('handle always starts with vs_', () => {
+      for (let i = 0; i < 10; i++) {
+        expect(callGenerateHandle(service)).toMatch(/^vs_/);
+      }
+    });
+  });
 });

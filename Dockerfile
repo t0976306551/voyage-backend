@@ -22,8 +22,13 @@ RUN npm ci --omit=dev
 # Copy compiled output
 COPY --from=builder /app/dist ./dist
 
-# Uploads volume mount point (bind-mount or named volume in production)
-RUN mkdir -p uploads
+# Create non-root user, set up uploads dir with correct ownership
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs && \
+    mkdir -p uploads && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
 
 EXPOSE 4000
 

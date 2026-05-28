@@ -52,11 +52,27 @@ export async function createExpense(req: Request, res: Response): Promise<void> 
         res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must be an object'));
         return;
       }
-      for (const [k, v] of Object.entries(body.splitInfo)) {
-        if (!k || typeof v !== 'number' || !isFinite(v) || v < 0) {
+      let splitTotal = 0;
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const entries = Object.entries(body.splitInfo);
+      if (entries.length > 50) {
+        res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must not have more than 50 entries'));
+        return;
+      }
+      for (const [k, v] of entries) {
+        if (!k || !UUID_RE.test(k)) {
+          res.status(400).json(fail('INVALID_SPLIT', 'splitInfo keys must be valid user UUIDs'));
+          return;
+        }
+        if (typeof v !== 'number' || !isFinite(v) || v < 0) {
           res.status(400).json(fail('INVALID_SPLIT', 'splitInfo values must be non-negative numbers'));
           return;
         }
+        splitTotal += v;
+      }
+      if (splitTotal > body.amount * 1.01) {
+        res.status(400).json(fail('INVALID_SPLIT', 'splitInfo total must not exceed the expense amount'));
+        return;
       }
     }
     if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {
@@ -106,11 +122,18 @@ export async function updateExpense(req: Request, res: Response): Promise<void> 
         res.status(400).json(fail('INVALID_SPLIT', 'splitInfo must be an object'));
         return;
       }
+      let splitTotal = 0;
       for (const [k, v] of Object.entries(body.splitInfo)) {
         if (!k || typeof v !== 'number' || !isFinite(v) || v < 0) {
           res.status(400).json(fail('INVALID_SPLIT', 'splitInfo values must be non-negative numbers'));
           return;
         }
+        splitTotal += v;
+      }
+      // Only validate against amount when amount is also being updated in this request.
+      if (body.amount !== undefined && splitTotal > body.amount * 1.01) {
+        res.status(400).json(fail('INVALID_SPLIT', 'splitInfo total must not exceed the expense amount'));
+        return;
       }
     }
     if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 1000) {

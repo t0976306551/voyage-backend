@@ -27,6 +27,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'voyagestack',
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } : false,
   entities: [User, Trip, Itinerary, Expense, Task, Attachment, ChecklistItem, ChecklistAssignment, TripInvitation, InvitationHistory, PersonalMemo, PersonalMemoItem, PersonalExpense, PersonalSettings],
   // Production: point to compiled JS; dev: TypeScript source via ts-node
   migrations: [

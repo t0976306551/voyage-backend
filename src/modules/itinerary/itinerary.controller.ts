@@ -50,8 +50,8 @@ export async function getItinerary(req: Request, res: Response): Promise<void> {
     }
     if (typeof dayParam === 'string' && dayParam.length > 0) {
       const day = parseInt(dayParam, 10);
-      if (Number.isNaN(day) || day < 1) {
-        res.status(400).json(fail('INVALID_DAY', 'day must be a positive integer'));
+      if (Number.isNaN(day) || day < 1 || day > 1000) {
+        res.status(400).json(fail('INVALID_DAY', 'day must be an integer between 1 and 1000'));
         return;
       }
       const items = await service.getItemsByDay(tripId, day);
@@ -87,8 +87,8 @@ export async function createItem(req: Request, res: Response): Promise<void> {
       return;
     }
     if (body.day !== undefined && body.day !== null) {
-      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1) {
-        res.status(400).json(fail('INVALID_DAY', 'day must be a positive integer'));
+      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1 || body.day > 1000) {
+        res.status(400).json(fail('INVALID_DAY', 'day must be an integer between 1 and 1000'));
         return;
       }
     }
@@ -150,8 +150,8 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
       return;
     }
     if (body.day !== undefined && body.day !== null) {
-      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1) {
-        res.status(400).json(fail('INVALID_DAY', 'day must be a positive integer'));
+      if (typeof body.day !== 'number' || !Number.isInteger(body.day) || body.day < 1 || body.day > 1000) {
+        res.status(400).json(fail('INVALID_DAY', 'day must be an integer between 1 and 1000'));
         return;
       }
     }

@@ -7,6 +7,12 @@ import { broadcastToTrip } from '../../socket/broadcaster';
 
 const VALID_CATEGORIES: PersonalExpenseCategory[] = ['food', 'transport', 'lodging', 'shopping', 'activity', 'other'];
 
+const ALLOWED_CURRENCIES = new Set([
+  'TWD', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'HKD', 'SGD', 'KRW',
+  'CNY', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'INR', 'CHF', 'NZD', 'SEK',
+  'NOK', 'DKK', 'BRL', 'ZAR', 'MXN', 'AED', 'SAR', 'TRY', 'ILS', 'CZK',
+]);
+
 const service = new PersonalService(new PersonalRepository());
 
 export const personalRouter = Router({ mergeParams: true });
@@ -176,6 +182,10 @@ personalRouter.post('/expenses', async (req: Request, res: Response) => {
       res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT}`));
       return;
     }
+    if (body.currency !== undefined && body.currency !== null && typeof body.currency === 'string' && !ALLOWED_CURRENCIES.has(body.currency)) {
+      res.status(400).json(fail('INVALID_CURRENCY', 'Unsupported currency code'));
+      return;
+    }
     if (body.spentAt !== undefined && body.spentAt !== null && body.spentAt !== '') {
       if (typeof body.spentAt !== 'string' || isNaN(new Date(body.spentAt).getTime())) {
         res.status(400).json(fail('INVALID_DATE', 'spentAt must be a valid date string'));
@@ -208,6 +218,10 @@ personalRouter.patch('/expenses/:expenseId', async (req: Request, res: Response)
     const MAX_AMOUNT_PATCH = 10_000_000;
     if (body.amount !== undefined && (typeof body.amount !== 'number' || !isFinite(body.amount) || body.amount <= 0 || body.amount > MAX_AMOUNT_PATCH)) {
       res.status(400).json(fail('INVALID_AMOUNT', `amount must be a positive number up to ${MAX_AMOUNT_PATCH}`));
+      return;
+    }
+    if (body.currency !== undefined && body.currency !== null && typeof body.currency === 'string' && !ALLOWED_CURRENCIES.has(body.currency)) {
+      res.status(400).json(fail('INVALID_CURRENCY', 'Unsupported currency code'));
       return;
     }
     if (body.spentAt !== undefined && body.spentAt !== null && body.spentAt !== '') {
