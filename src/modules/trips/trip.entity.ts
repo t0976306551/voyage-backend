@@ -42,6 +42,9 @@ export class Trip {
   @Column({ name: 'invite_code', unique: true })
   inviteCode!: string;
 
+  @Column({ name: 'invite_code_expires_at', type: 'timestamptz', nullable: true, default: null })
+  inviteCodeExpiresAt!: Date | null;
+
   @Column({ name: 'cover_image', nullable: true })
   coverImage!: string;
 

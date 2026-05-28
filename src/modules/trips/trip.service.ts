@@ -128,9 +128,11 @@ export class TripService {
   constructor(private repo: TripRepository) {}
 
   async createTrip(dto: CreateTripDto, userId: string): Promise<Trip> {
+    const inviteCodeExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     return this.repo.create({
       ...dto,
       inviteCode: generateInviteCode(),
+      inviteCodeExpiresAt,
       members: [{ userId, role: 'Owner' }],
     });
   }
@@ -206,6 +208,10 @@ export class TripService {
     const trip = await this.repo.findByInviteCode(code);
     if (!trip) throw new Error('NOT_FOUND');
 
+    if (trip.inviteCodeExpiresAt && trip.inviteCodeExpiresAt < new Date()) {
+      throw new Error('EXPIRED_INVITE_CODE');
+    }
+
     const alreadyMember = trip.members.some((m) => m.userId === userId);
     if (alreadyMember) return trip;
 
@@ -213,6 +219,17 @@ export class TripService {
     const updated = await this.repo.update(trip.id, { members: updatedMembers });
     await trackOwnerHistory(updated, userId);
     return updated;
+  }
+
+  async rotateInviteCode(tripId: string): Promise<Trip> {
+    const trip = await this.repo.findById(tripId);
+    if (!trip) throw new Error('NOT_FOUND');
+
+    const inviteCodeExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    return this.repo.update(tripId, {
+      inviteCode: generateInviteCode(),
+      inviteCodeExpiresAt,
+    });
   }
 
   async removeMember(tripId: string, targetUserId: string): Promise<HydratedTrip> {

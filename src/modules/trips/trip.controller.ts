@@ -353,6 +353,20 @@ export async function joinByInviteCode(req: Request, res: Response): Promise<voi
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'UNKNOWN';
     if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Invite code not found'));
+    else if (msg === 'EXPIRED_INVITE_CODE') res.status(410).json(fail('EXPIRED_INVITE_CODE', 'This invite code has expired'));
+    else res.status(500).json(fail('INTERNAL', 'Internal server error'));
+  }
+}
+
+export async function rotateInviteCode(req: Request, res: Response): Promise<void> {
+  try {
+    const tripId = req.params['tripId'] as string;
+    const trip = await service.rotateInviteCode(tripId);
+    broadcastToTrip(tripId, 'trip:updated', { tripId, inviteCode: trip.inviteCode, inviteCodeExpiresAt: trip.inviteCodeExpiresAt });
+    res.json(ok(trip));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'UNKNOWN';
+    if (msg === 'NOT_FOUND') res.status(404).json(fail('NOT_FOUND', 'Trip not found'));
     else res.status(500).json(fail('INTERNAL', 'Internal server error'));
   }
 }
