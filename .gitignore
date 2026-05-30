@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.log
+
+# 使用者上傳的執行期內容（行程封面等）—— 不該進版控
+uploads/
+!uploads/.gitkeep
