@@ -13,10 +13,18 @@ import { authMiddleware } from './shared/middleware/auth.middleware';
 import { authLimiter, joinLimiter, generalApiLimiter } from './shared/middleware/rate-limit.middleware';
 import { initSocketIO } from './socket/socket.service';
 import { AppDataSource } from './data-source';
+import { resolveTrustProxy, logTrustProxyStatus } from './shared/config/trust-proxy';
 
 dotenv.config();
 
 const app = express();
+
+// Behind a reverse proxy / load balancer, derive the real client IP from
+// X-Forwarded-For so IP-based rate limiting keys on the user, not the proxy.
+// Inert unless TRUST_PROXY is set — see .env.example for accepted values.
+const trustProxy = resolveTrustProxy(process.env.TRUST_PROXY);
+if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+logTrustProxyStatus(trustProxy);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
